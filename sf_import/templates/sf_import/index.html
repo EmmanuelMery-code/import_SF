@@ -1,25 +1,31 @@
 {% extends "sf_import/base.html" %}
 {% load i18n %}
+{% load static %}
 
 {% block title %}{% trans "Accueil" %} - {% trans "Import Salesforce" %}{% endblock %}
 
 {% block content %}
-<div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 2rem; max-width: 600px;">
-    <h2 style="margin-top: 0;">{% trans "Charger un fichier Excel" %}</h2>
-    <p style="color: var(--muted);">{% trans "Format .xlsx ou .xls avec un onglet _Config_ pour l'ordre et les correspondances." %}</p>
+<div class="upload-with-image" style="display: flex; align-items: flex-start; gap: 2rem; flex-wrap: wrap;">
+    <div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 2rem; max-width: 600px; flex: 1 1 320px;">
+        <h2 style="margin-top: 0;">{% trans "Charger un fichier Excel" %}</h2>
+        <p style="color: var(--muted);">{% trans "Format .xlsx ou .xls avec un onglet _Config_ pour l'ordre et les correspondances." %}</p>
 
-    <form method="post" action="{% url 'upload' %}" enctype="multipart/form-data" style="margin-top: 1.5rem;">
-        {% csrf_token %}
-        <input type="file" name="excel_file" accept=".xlsx,.xls" required
-               style="display: block; margin-bottom: 1rem; padding: 0.5rem; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); width: 100%;">
-        <button type="submit" class="btn">{% trans "Charger le fichier" %}</button>
-    </form>
+        <form method="post" action="{% url 'upload' %}" enctype="multipart/form-data" style="margin-top: 1.5rem;">
+            {% csrf_token %}
+            <input type="file" name="excel_file" accept=".xlsx,.xls" required
+                   style="display: block; margin-bottom: 1rem; padding: 0.5rem; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); width: 100%;">
+            <button type="submit" class="btn">{% trans "Charger le fichier" %}</button>
+        </form>
 
-    {% if not connected %}
-    <p style="margin-top: 1.5rem; color: var(--muted); font-size: 0.9rem;">
-        {% trans "Connectez-vous à Salesforce via le bouton en haut pour pouvoir lancer les imports." %}
-    </p>
-    {% endif %}
+        {% if not connected %}
+        <p style="margin-top: 1.5rem; color: var(--muted); font-size: 0.9rem;">
+            {% trans "Connectez-vous à Salesforce via le bouton en haut pour pouvoir lancer les imports." %}
+        </p>
+        {% endif %}
+    </div>
+    <div class="upload-image" style="flex-shrink: 0;">
+        <img src="{% static 'sf_import/images/Salesforce-Data-Blendizer.png' %}" alt="Salesforce Data Blendizer" style="max-width: 280px; height: auto;" onerror="this.onerror=null; this.src='{% static 'sf_import/images/Salesforce-Data-Blendizer.svg' %}';">
+    </div>
 </div>
 
 {% if current_file_name %}

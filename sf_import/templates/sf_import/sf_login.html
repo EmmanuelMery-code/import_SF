@@ -1,10 +1,12 @@
 {% extends "sf_import/base.html" %}
 {% load i18n %}
+{% load static %}
 
 {% block title %}{% trans "Connexion Salesforce" %}{% endblock %}
 
 {% block content %}
-<div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 2rem; max-width: 700px;">
+<div class="login-with-image" style="display: flex; align-items: flex-start; gap: 2rem; flex-wrap: wrap;">
+<div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 2rem; max-width: 700px; flex: 1 1 320px;">
     <h2 style="margin-top: 0;">{% trans "Connexion Salesforce (sans Connected App)" %}</h2>
 
     <p style="color: var(--muted);">{% trans "Connectez-vous à Salesforce dans votre navigateur, puis récupérez votre Session ID pour l'utiliser ici." %}</p>
@@ -46,6 +48,10 @@
             <button type="submit" class="btn">{% trans "Enregistrer et se connecter" %}</button>
         </form>
     </details>
+</div>
+    <div class="login-image" style="flex-shrink: 0;">
+        <img src="{% static 'sf_import/images/Salesforce-Data-Blendizer.png' %}" alt="Salesforce Data Blendizer" style="max-width: 280px; height: auto;" onerror="this.onerror=null; this.src='{% static 'sf_import/images/Salesforce-Data-Blendizer.svg' %}';">
+    </div>
 </div>
 {% endblock %}
 
