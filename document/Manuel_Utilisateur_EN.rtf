@@ -1,0 +1,115 @@
+{\rtf1\ansi\ansicpg1252\deff0\nouicompat{\fonttbl{\f0\fnil\fcharset0 Calibri;}{\f1\fnil\fcharset0 Consolas;}}
+{\colortbl ;\red0\green112\blue192;\red192\green0\blue0;}
+\viewkind4\uc1\pard\sa200\sl276\slmult1\f0\fs22\lang1033
+
+\b\fs28 User Manual\b0\fs22\par
+\b Salesforce Multi-Sheet Import\b0\par
+\par
+Django application to import data into Salesforce from a multi-sheet Excel file, with Session ID authentication and automatic ID replication across sheets.\par
+\par
+
+\b\fs24 1. TOOL PURPOSE\b0\fs22\par
+\par
+This tool imports data in bulk from an Excel file (.xlsx or .xls) into Salesforce. It handles:\par
+\bullet  Multiple related sheets (e.g. Accounts, Contacts, Opportunities)\par
+\bullet  ID replication across sheets (e.g. AccountId on Contacts after Accounts import)\par
+\bullet  Configuration via a _Config_ sheet in the Excel file\par
+\par
+No Salesforce Connected App is required: Session ID connection is sufficient.\par
+\par
+
+\b\fs24 2. INSTALLATION\b0\fs22\par
+\par
+
+\b 2.1 Prerequisites\b0\par
+\bullet  Python 3.9 or higher\par
+\bullet  pip\par
+\par
+
+\b 2.2 Install dependencies\b0\par
+\f1 pip install -r requirements.txt\par
+\f0\par
+
+\b 2.3 Migrations and launch\b0\par
+\f1 python manage.py migrate\par
+python manage.py runserver\par
+\f0\par
+Open \cf1 http://localhost:8000/\cf0\par
+\par
+
+\b\fs24 3. SALESFORCE CONNECTION\b0\fs22\par
+\par
+Click "Salesforce Login" in the menu.\par
+\par
+\b Option 1 - Bookmarklet:\b0 Drag the "Retrieve my session" link to your bookmarks. On a Salesforce page (e.g. /services/data/), click it to retrieve the instance URL and Session ID.\par
+\par
+\b Option 2 - Manual entry:\b0 Open a Visualforce page displaying \f1 \{!$Api.Session_ID\}\f0 , or use Developer Console: Execute Anonymous - \f1 System.debug(UserInfo.getSessionId());\f0\par
+\par
+\cf2 Important: Lightning does not provide a Session ID usable for the API. Use a Visualforce page in preview mode.\cf0\par
+\par
+
+\b\fs24 4. EXPLORER VIEW\b0\fs22\par
+\par
+The Explorer provides a full interface:\par
+\bullet  \b Left tree:\b0 File content (sheets), Configuration, Preview\par
+\bullet  \b Central panel:\b0 Content of the selected item\par
+\bullet  \b Select file:\b0 Load an existing Excel file\par
+\bullet  \b Create file:\b0 Generate a template file from Salesforce objects\par
+\par
+\b 4.1 Right-click on Configuration\b0\par
+\bullet  Start new configuration: reset everything\par
+\bullet  Add sheet: modal to create a new sheet\par
+\bullet  Export configuration and sheets\par
+\bullet  Graphic view: display mappings as a diagram\par
+\par
+\b 4.2 Right-click on a sheet (treeview)\b0\par
+\bullet  Add child sheet\par
+\bullet  Rename this sheet\par
+\bullet  Delete this sheet\par
+\par
+\b 4.3 Graphic view\b0\par
+Each sheet is a card. Arrows connect related fields (mappings).\par
+\bullet  Right-click on a field: Add/Remove pivot columns, Set arrow start/end, Delete arrow\par
+\bullet  Right-click on a card: Delete this sheet\par
+\bullet  Drag the header to move, bottom-right corner to resize\par
+\par
+
+\b\fs24 5. EXCEL FILE STRUCTURE\b0\fs22\par
+\par
+The \f1 _Config_\f0 sheet contains:\par
+\par
+\b SheetOrder:\b0\par
+(empty) | SheetName | Order | SalesforceObject | IdColumn | Mode | UpsertField\par
+| Accounts | 1 | Account | Id | insert |\par
+| Contacts | 2 | Contact | Id | insert |\par
+\par
+\b Mappings:\b0\par
+(empty) | SourceSheet | SourceColumn | TargetSheet | TargetColumn | SalesforceField\par
+| Accounts | RefExternal | Contacts | RefAccount | AccountId\par
+\par
+\b PivotColumns:\b0\par
+Columns NOT imported (used only for mapping).\par
+(empty) | Sheet | Column\par
+| Contacts | RefAccount\par
+\par
+
+\b\fs24 6. USAGE\b0\fs22\par
+\par
+1. Load an Excel file (or create one)\par
+2. Configure sheets, mappings and pivot columns via the interface or the _Config_ sheet\par
+3. Preview the data\par
+4. Connect to Salesforce and run the import\par
+\par
+After import, Salesforce IDs are replicated to the linked columns.\par
+\par
+
+\b\fs24 7. TROUBLESHOOTING\b0\fs22\par
+\par
+\b Invalid session:\b0 Use a Visualforce page in preview mode, not Lightning.\par
+\par
+\b Column not imported:\b0 Add it as PivotColumn or as TargetColumn in a mapping.\par
+\par
+\b Error on rows:\b0 Check required fields and data types in Salesforce.\par
+\par
+\par
+}

@@ -1,0 +1,283 @@
+# English translations for sf_import
+# Copyright (C) 2025
+# This file is distributed under the same license as the sf_import package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-01-01 00:00+0000\n"
+"PO-Revision-Date: 2025-01-01 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: en\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+# base.html
+msgid "Prévisualisation"
+msgstr "Preview"
+
+msgid "Import Salesforce"
+msgstr "Import Salesforce"
+
+msgid "Session ID"
+msgstr "Session ID"
+
+msgid "Accueil"
+msgstr "Home"
+
+msgid "Connecté"
+msgstr "Connected"
+
+msgid "Déconnexion"
+msgstr "Log out"
+
+msgid "Déconnecté"
+msgstr "Disconnected"
+
+msgid "Connexion Salesforce"
+msgstr "Salesforce Login"
+
+msgid "Créer un fichier pour import"
+msgstr "Create import file"
+
+msgid "Explorateur"
+msgstr "Explorer"
+
+msgid "Sélectionner un fichier"
+msgstr "Select a file"
+
+msgid "Configuration"
+msgstr "Configuration"
+
+msgid "Aucun fichier"
+msgstr "No file"
+
+msgid "Chargez d'abord un fichier pour accéder à la configuration."
+msgstr "Load a file first to access configuration."
+
+msgid "Voir la prévisualisation et lancer l'import"
+msgstr "View preview and launch import"
+
+msgid "Rafraîchir l'arborescence"
+msgstr "Refresh tree"
+
+msgid "Vue classique"
+msgstr "Classic view"
+
+msgid "Vue Explorateur"
+msgstr "Explorer view"
+
+msgid "Connectez-vous à Salesforce pour accéder à cette fonctionnalité."
+msgstr "Connect to Salesforce to access this feature."
+
+msgid "Ne fonctionne pas avec Lightning."
+msgstr "Does not work with Lightning."
+
+msgid "Ajouter un onglet"
+msgstr "Add sheet"
+
+msgid "Ajouter un onglet enfant"
+msgstr "Add child sheet"
+
+msgid "Nom de l'onglet"
+msgstr "Sheet name"
+
+msgid "Ajouter"
+msgstr "Add"
+
+msgid "Annuler"
+msgstr "Cancel"
+
+msgid "Vue graphique"
+msgstr "Graphical view"
+
+msgid "Vue tableau"
+msgstr "Table view"
+
+msgid "Ajouter aux colonnes pivot"
+msgstr "Add to pivot columns"
+
+msgid "Retirer des colonnes pivot"
+msgstr "Remove from pivot columns"
+
+msgid "Redimensionner"
+msgstr "Resize"
+
+msgid "Champ parent"
+msgstr "Parent field"
+
+msgid "Champ enfant"
+msgstr "Child field"
+
+msgid "Définir comme début de flèche"
+msgstr "Set as arrow start"
+
+msgid "Définir comme fin de flèche"
+msgstr "Set as arrow end"
+
+msgid "Cliquez sur le champ cible (autre onglet)"
+msgstr "Click on the target field (other sheet)"
+
+msgid "Cliquez sur le champ source (autre onglet)"
+msgstr "Click on the source field (other sheet)"
+
+msgid "Supprimer la flèche"
+msgstr "Remove arrow"
+
+msgid "Renommer cet onglet"
+msgstr "Rename this sheet"
+
+msgid "Nouveau nom de l'onglet"
+msgstr "New sheet name"
+
+msgid "Contenu du fichier"
+msgstr "File content"
+
+msgid "Commencer une nouvelle configuration"
+msgstr "Start a new configuration"
+
+msgid "Exporter la configuration et les onglets"
+msgstr "Export configuration and sheets"
+
+# index.html
+msgid "Charger un fichier Excel"
+msgstr "Load an Excel file"
+
+msgid "Format .xlsx ou .xls avec un onglet _Config_ pour l'ordre et les correspondances."
+msgstr "Format .xlsx or .xls with a _Config_ sheet for order and mappings."
+
+msgid "Charger le fichier"
+msgstr "Load file"
+
+msgid "Connectez-vous à Salesforce via le bouton en haut pour pouvoir lancer les imports."
+msgstr "Connect to Salesforce via the button above to run imports."
+
+msgid "Fichier actuel"
+msgstr "Current file"
+
+msgid "Voir la prévisualisation"
+msgstr "View preview"
+
+# sf_login.html
+msgid "Connexion Salesforce (sans Connected App)"
+msgstr "Salesforce Login (without Connected App)"
+
+msgid "Connectez-vous à Salesforce dans votre navigateur, puis récupérez votre Session ID pour l'utiliser ici."
+msgstr "Connect to Salesforce in your browser, then retrieve your Session ID to use here."
+
+msgid "Étape 1 : Connexion web"
+msgstr "Step 1: Web login"
+
+msgid "Ouvrir Salesforce (production)"
+msgstr "Open Salesforce (production)"
+
+msgid "Ouvrir Salesforce (sandbox)"
+msgstr "Open Salesforce (sandbox)"
+
+msgid "Une fois connecté, gardez l'onglet ouvert et revenez ici."
+msgstr "Once connected, keep the tab open and return here."
+
+msgid "Étape 2 : Récupérer le Session ID"
+msgstr "Step 2: Retrieve Session ID"
+
+msgid "Alternative : Bookmarklet (sur une page Visualforce ou Classic)"
+msgstr "Alternative: Bookmarklet (on a Visualforce or Classic page)"
+
+msgid "Saisie manuelle"
+msgstr "Manual entry"
+
+msgid "Collez l'URL d'instance et le Session ID obtenus via la page Visualforce :"
+msgstr "Paste the instance URL and Session ID obtained via the Visualforce page:"
+
+msgid "URL d'instance"
+msgstr "Instance URL"
+
+msgid "Coller le Session ID ici..."
+msgstr "Paste Session ID here..."
+
+msgid "Enregistrer et se connecter"
+msgstr "Save and connect"
+
+msgid "Récupérer ma session"
+msgstr "Retrieve my session"
+
+# preview.html
+msgid "Mode d'import"
+msgstr "Import mode"
+
+msgid "Champ externe ID"
+msgstr "External ID field"
+
+msgid "Ordre"
+msgstr "Order"
+
+msgid "Objet"
+msgstr "Object"
+
+msgid "(non défini)"
+msgstr "(undefined)"
+
+msgid "lignes"
+msgstr "lines"
+
+msgid "Lancer l'import"
+msgstr "Launch import"
+
+msgid "Se connecter à Salesforce pour importer"
+msgstr "Connect to Salesforce to import"
+
+msgid "Lignes en échec"
+msgstr "Failed rows"
+
+msgid "Onglet"
+msgstr "Sheet"
+
+msgid "Ligne"
+msgstr "Row"
+
+msgid "Import en cours..."
+msgstr "Import in progress..."
+
+msgid "Erreur inconnue"
+msgstr "Unknown error"
+
+msgid "Erreur serveur (réponse invalide). Code: "
+msgstr "Server error (invalid response). Code: "
+
+msgid "Erreur réseau : "
+msgstr "Network error: "
+
+# create_import_file.html
+msgid "Sélectionnez les objets Salesforce pour générer un fichier Excel prêt à l'import. Chaque onglet contiendra les champs avec des commentaires d'aide."
+msgstr "Select Salesforce objects to generate a ready-to-import Excel file. Each sheet will contain fields with helper comments."
+
+msgid "Filtrer les objets..."
+msgstr "Filter objects..."
+
+msgid "Tout sélectionner"
+msgstr "Select all"
+
+msgid "Tout désélectionner"
+msgstr "Deselect all"
+
+msgid "Objets standard uniquement"
+msgstr "Standard objects only"
+
+msgid "Objets personnalisés uniquement"
+msgstr "Custom objects only"
+
+msgid "Aucun objet disponible. Connectez-vous à Salesforce."
+msgstr "No objects available. Connect to Salesforce."
+
+msgid "Générer le fichier Excel"
+msgstr "Generate Excel file"
+
+msgid "Supprimer cet onglet"
+msgstr "Delete this sheet"
+
+msgid "Supprimer définitivement cet onglet ?"
+msgstr "Permanently delete this sheet?"

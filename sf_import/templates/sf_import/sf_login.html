@@ -1,0 +1,60 @@
+{% extends "sf_import/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Connexion Salesforce" %}{% endblock %}
+
+{% block content %}
+<div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 2rem; max-width: 700px;">
+    <h2 style="margin-top: 0;">{% trans "Connexion Salesforce (sans Connected App)" %}</h2>
+
+    <p style="color: var(--muted);">{% trans "Connectez-vous à Salesforce dans votre navigateur, puis récupérez votre Session ID pour l'utiliser ici." %}</p>
+
+    <h3 style="margin-top: 1.5rem;">{% trans "Étape 1 : Connexion web" %}</h3>
+    <p>
+        <a href="https://login.salesforce.com" target="_blank" rel="noopener" class="btn">{% trans "Ouvrir Salesforce (production)" %}</a>
+        <a href="https://test.salesforce.com" target="_blank" rel="noopener" class="btn btn-secondary" style="margin-left: 0.5rem;">{% trans "Ouvrir Salesforce (sandbox)" %}</a>
+    </p>
+    <p style="font-size: 0.9rem; color: var(--muted);">{% trans "Une fois connecté, gardez l'onglet ouvert et revenez ici." %}</p>
+
+    <h3 style="margin-top: 1.5rem;">{% trans "Étape 2 : Récupérer le Session ID" %}</h3>
+
+    <details style="margin: 1rem 0;">
+        <summary style="cursor: pointer; color: var(--accent);">{% trans "Alternative : Bookmarklet (sur une page Visualforce ou Classic)" %}</summary>
+        <p style="margin-top: 0.5rem; font-size: 0.9rem;">Ouvrez d'abord <code>/services/data/</code> dans votre org (ex: <code>https://votre-org.my.salesforce.com/services/data/</code>), puis cliquez ce lien :</p>
+        <a id="bookmarklet" href="#" style="display: inline-block; margin: 0.5rem 0; padding: 0.5rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--accent); text-decoration: none; font-size: 0.85rem; word-break: break-all;">{% trans "Récupérer ma session" %}</a>
+        <p style="font-size: 0.8rem; color: var(--muted);">Ne fonctionne pas avec Lightning.</p>
+    </details>
+
+    <details style="margin: 1rem 0;">
+        <summary style="cursor: pointer; color: var(--accent);">{% trans "Saisie manuelle" %}</summary>
+        <p style="margin-top: 0.5rem; font-size: 0.9rem;">{% trans "Collez l'URL d'instance et le Session ID obtenus via la page Visualforce :" %}</p>
+
+        <form method="post" action="{% url 'sf_login_submit' %}" style="margin-top: 1rem;">
+            {% csrf_token %}
+            <div style="margin-bottom: 1rem;">
+                <label for="instance_url" style="display: block; margin-bottom: 0.25rem;">{% trans "URL d'instance" %}</label>
+                <input type="text" id="instance_url" name="instance_url" required
+                       placeholder="https://na1.salesforce.com ou https://votredomaine.my.salesforce.com"
+                       style="width: 100%; padding: 0.5rem; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <label for="session_id" style="display: block; margin-bottom: 0.25rem;">{% trans "Session ID" %}</label>
+                <textarea id="session_id" name="session_id" required rows="3"
+                          placeholder="{% trans 'Coller le Session ID ici...' %}"
+                          style="width: 100%; padding: 0.5rem; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-family: monospace; font-size: 0.85rem;"></textarea>
+            </div>
+            <button type="submit" class="btn">{% trans "Enregistrer et se connecter" %}</button>
+        </form>
+    </details>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    var callbackUrl = "{{ request.scheme }}://{{ request.get_host }}{% url 'sf_callback' %}";
+    var js = "javascript:(function(){var m=document.cookie.match(/sid=([^;]+)/);var sid=m?m[1]:'';var h=window.location.hostname;var inst='https://'+h;if(sid){window.location=\""+callbackUrl+"?sid=\"+encodeURIComponent(sid)+\"&instance=\"+encodeURIComponent(inst);}else{alert('Session non trouvée. Connectez-vous à Salesforce ou utilisez la saisie manuelle.');}})();";
+    document.getElementById('bookmarklet').href = js;
+})();
+</script>
+{% endblock %}

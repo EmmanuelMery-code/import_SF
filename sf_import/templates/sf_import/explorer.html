@@ -1,0 +1,1184 @@
+{% load i18n %}
+<!DOCTYPE html>
+<html lang="{% get_current_language as lang %}{{ lang }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% trans "Import Salesforce" %} - {% trans "Explorateur" %}</title>
+    <style>
+        :root {
+            --bg: #0f1419;
+            --surface: #1a2332;
+            --border: #2d3a4d;
+            --text: #e6edf3;
+            --muted: #8b949e;
+            --accent: #58a6ff;
+            --success: #3fb950;
+            --error: #f85149;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; min-height: 100vh; }
+        .explorer-layout { display: flex; flex-direction: column; height: 100vh; }
+        .explorer-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0.5rem 1rem; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0;
+        }
+        .explorer-header-left { display: flex; align-items: center; gap: 1rem; }
+        .explorer-header-right { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; }
+        .explorer-header h1 { font-size: 1.1rem; margin: 0; font-weight: 600; }
+        .lang-btn { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 0.2rem 0.4rem; cursor: pointer; font-size: 0.8rem; border-radius: 4px; }
+        .lang-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .lang-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+        .conn-badge { padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 500; }
+        .conn-badge.connected { color: var(--success); background: rgba(63, 185, 80, 0.15); }
+        .conn-badge.disconnected { color: var(--error); background: rgba(248, 81, 73, 0.15); }
+        .file-badge { color: var(--muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .explorer-body { display: flex; flex: 1; min-height: 0; }
+        .explorer-sidebar {
+            width: 260px; min-width: 200px; border-right: 1px solid var(--border); background: var(--surface);
+            overflow-y: auto; padding: 0.5rem 0;
+        }
+        .explorer-content { flex: 1; overflow: auto; padding: 1rem; background: var(--bg); }
+        .tree-item { display: flex; align-items: center; padding: 0.35rem 0.5rem; cursor: pointer; font-size: 0.9rem; }
+        .tree-item:hover { background: rgba(88, 166, 255, 0.15); }
+        .tree-item.active { background: rgba(88, 166, 255, 0.25); color: var(--accent); }
+        .tree-item.toggle { padding-left: 0.25rem; }
+        .tree-toggle { width: 1rem; margin-right: 0.25rem; font-size: 0.7rem; color: var(--muted); flex-shrink: 0; }
+        .tree-toggle::before { content: '▶'; }
+        .tree-item.expanded .tree-toggle::before { content: '▼'; }
+        .tree-children { margin-left: 1.25rem; padding-left: 0.5rem; border-left: 1px solid var(--border); }
+        .tree-node { margin: 0.15rem 0; }
+        .tree-node .tree-node { margin-left: 0; }
+        .tree-item.has-children .tree-toggle { visibility: visible; }
+        .tree-item:not(.has-children) .tree-toggle { visibility: hidden; width: 0; margin: 0; }
+        .content-panel { display: none; }
+        .content-panel.active { display: block; }
+        .btn { padding: 0.5rem 1rem; background: var(--accent); color: var(--bg); border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+        .btn:hover { opacity: 0.9; }
+        .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; max-width: 600px; }
+        .table-wrap { overflow-x: auto; margin: 1rem 0; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th, td { padding: 0.4rem 0.6rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--surface); position: sticky; top: 0; }
+        tr:hover { background: rgba(255,255,255,0.03); }
+        .config-box { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; font-family: monospace; font-size: 0.8rem; white-space: pre-wrap; margin: 1rem 0; }
+        .config-editor h3 { font-size: 1rem; margin: 1rem 0 0.5rem; color: var(--accent); }
+        .config-editor table { margin-bottom: 1rem; }
+        .config-editor input, .config-editor select { padding: 0.35rem; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--text); max-width: 160px; }
+        .config-editor .help-text { font-size: 0.75rem; color: var(--muted); }
+        .config-editor .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.8rem; }
+        .config-editor .btn-add { background: var(--success); color: var(--bg); }
+        .config-editor .btn-remove { background: transparent; color: var(--error); border: 1px solid var(--error); }
+        .import-actions { margin: 1rem 0; }
+        .sheet-meta { margin-bottom: 1rem; font-size: 0.9rem; }
+        .sheet-meta .badge { padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; background: var(--border); }
+        .alert { padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
+        .alert-error { background: rgba(248, 81, 73, 0.2); border: 1px solid var(--error); }
+        .alert-success { background: rgba(63, 185, 80, 0.2); border: 1px solid var(--success); }
+        .no-file-msg { color: var(--muted); padding: 2rem; text-align: center; }
+        .tree-icon-file { margin-right: 0.35rem; }
+        /* Vue graphique */
+        .config-view-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+        .config-view-tab { padding: 0.5rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer; font-size: 0.9rem; }
+        .config-view-tab:hover { border-color: var(--accent); }
+        .config-view-tab.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+        .config-graph-view { display: none; position: relative; min-height: 500px; overflow: auto; }
+        .config-graph-view.active { display: block; }
+        .config-graph-container { position: relative; min-height: 520px; min-width: 960px; }
+        .config-graph-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; position: absolute; min-width: 180px; min-height: 120px; box-sizing: border-box; cursor: default; }
+        .config-graph-card .config-graph-card-header { cursor: move; user-select: none; }
+        .config-graph-card-resize { position: absolute; right: 0; bottom: 0; width: 14px; height: 14px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, var(--border) 50%); border-radius: 0 0 4px 0; pointer-events: auto; }
+        .config-graph-card-resize:hover { background: linear-gradient(135deg, transparent 50%, var(--accent) 50%); }
+        .config-graph-card-header { padding: 0.5rem 0.75rem; background: rgba(88, 166, 255, 0.15); border-bottom: 1px solid var(--border); font-weight: 600; font-size: 0.9rem; }
+        .config-graph-card-fields { overflow-y: auto; padding: 0.4rem 0.75rem; font-size: 0.8rem; line-height: 1.3; height: calc(100% - 2.2em); box-sizing: border-box; max-height: none; }
+        .config-graph-field { padding: 0.2rem 0; cursor: pointer; border-radius: 3px; }
+        .config-graph-field:hover { background: rgba(255,255,255,0.08); }
+        .config-graph-field.pivot { color: var(--accent); font-weight: 500; }
+        .config-graph-arrows { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 1; }
+        .config-graph-arrows svg { width: 100%; height: 100%; }
+        .config-graph-tooltip { position: fixed; z-index: 1003; background: var(--surface); border: 1px solid var(--accent); border-radius: 6px; padding: 0.5rem 0.75rem; font-size: 0.85rem; max-width: 320px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); pointer-events: none; white-space: pre-line; }
+    </style>
+</head>
+<body>
+    <div class="explorer-layout">
+        <header class="explorer-header">
+            <div class="explorer-header-left">
+                <h1>{% trans "Import Salesforce" %}</h1>
+                <form action="{% url 'set_language' %}" method="post" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button type="submit" name="language" value="fr" class="lang-btn {% if LANGUAGE_CODE == 'fr' %}active{% endif %}">FR</button>
+                    <button type="submit" name="language" value="en" class="lang-btn {% if LANGUAGE_CODE == 'en' %}active{% endif %}">EN</button>
+                </form>
+            </div>
+            <div class="explorer-header-right">
+                <span class="conn-badge {% if connected %}connected{% else %}disconnected{% endif %}">
+                    {% if connected %}{% trans "Connecté" %}{% else %}{% trans "Déconnecté" %}{% endif %}
+                </span>
+                {% if connected %}
+                <a href="{% url 'sf_logout' %}" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.35rem 0.75rem;">{% trans "Déconnexion" %}</a>
+                {% else %}
+                <button type="button" class="btn btn-show-login" data-panel="sf-login" style="font-size: 0.85rem; padding: 0.35rem 0.75rem;">{% trans "Connexion Salesforce" %}</button>
+                {% endif %}
+                {% if connected %}
+                {% if sf_org_name %}<span title="{{ sf_org_name }}">{{ sf_org_name|truncatechars:20 }}</span>{% endif %}
+                {% if sf_org_id %}<span style="font-family: monospace; font-size: 0.75rem; color: var(--accent);" title="{{ sf_org_id }}">{{ sf_org_id|truncatechars:15 }}</span>{% endif %}
+                {% if sf_instance_url %}<a href="{{ sf_instance_url }}" target="_blank" rel="noopener" style="color: var(--accent); font-size: 0.8rem;" title="{{ sf_instance_url }}">{{ sf_instance_url|truncatechars:25 }}</a>{% endif %}
+                {% endif %}
+                {% if file_name %}<span class="file-badge" title="{{ file_name }}">📄 {{ file_name }}</span>{% else %}<span class="file-badge">{% trans "Aucun fichier" %}</span>{% endif %}
+                <a href="{% url 'index' %}?view=classic" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.35rem 0.75rem;">{% trans "Vue classique" %}</a>
+            </div>
+        </header>
+
+        <div class="explorer-body">
+            <aside class="explorer-sidebar">
+                <div class="tree-item active" data-panel="select-file" role="button">
+                    <span class="tree-toggle"></span>
+                    <span class="tree-icon-file">📁</span> {% trans "Sélectionner un fichier" %}
+                </div>
+                <div class="tree-item" data-panel="create-import-file" role="button">
+                    <span class="tree-toggle"></span>
+                    <span class="tree-icon-file">📄</span> {% trans "Créer un fichier pour import" %}
+                </div>
+                <div class="tree-node" id="tree-node-content">
+                    <div class="tree-item has-children expanded" data-panel="preview" role="button" id="tree-item-content">
+                        <span class="tree-toggle"></span>
+                        <span class="tree-icon-file">📂</span> {% trans "Contenu du fichier" %}
+                    </div>
+                <div class="tree-children" id="tree-content-children">
+                    <div class="tree-item" data-panel="config" role="button" id="tree-item-config">
+                        <span class="tree-toggle"></span>
+                        <span class="tree-icon-file">⚙️</span> {% trans "Configuration" %}
+                    </div>
+                    <div class="tree-item" data-panel="preview" role="button">
+                        <span class="tree-toggle"></span>
+                        <span class="tree-icon-file">👁</span> {% trans "Prévisualisation" %}
+                    </div>
+                    {% for node in tree_nodes %}
+                    {% include "sf_import/explorer_tree_node.html" with node=node %}
+                    {% endfor %}
+                </div>
+                </div>
+                <div style="margin-top: 0.75rem; padding: 0 0.5rem;">
+                    <button type="button" class="btn btn-secondary" id="btn-refresh-tree" style="width:100%; font-size:0.8rem;">{% trans "Rafraîchir l'arborescence" %}</button>
+                </div>
+            </aside>
+
+            <main class="explorer-content">
+                <div id="panel-select-file" class="content-panel active">
+                    <div class="card">
+                        <h2 style="margin-top: 0;">{% trans "Charger un fichier Excel" %}</h2>
+                        <p style="color: var(--muted); font-size: 0.9rem;">{% trans "Format .xlsx ou .xls avec un onglet _Config_ pour l'ordre et les correspondances." %}</p>
+                        <form method="post" action="{% url 'explorer_upload' %}" enctype="multipart/form-data" style="margin-top: 1rem;">
+                            {% csrf_token %}
+                            <input type="file" name="excel_file" accept=".xlsx,.xls" required
+                                   style="display: block; margin-bottom: 1rem; padding: 0.5rem; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); width: 100%;">
+                            <button type="submit" class="btn">{% trans "Charger le fichier" %}</button>
+                        </form>
+                        {% if not connected %}
+                        <p style="margin-top: 1rem; color: var(--muted); font-size: 0.85rem;">{% trans "Connectez-vous à Salesforce via le menu pour lancer les imports." %}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div id="panel-create-import-file" class="content-panel">
+                    <div class="create-file-container" style="max-width: 900px;">
+                        <h2 style="margin-top: 0; color: var(--accent);">{% trans "Créer un fichier pour import" %}</h2>
+                        <p style="color: var(--muted); margin-bottom: 1rem;">{% trans "Sélectionnez les objets Salesforce pour générer un fichier Excel prêt à l'import. Chaque onglet contiendra les champs avec des commentaires d'aide." %}</p>
+                        {% if not connected %}
+                        <p style="color: var(--muted);">{% trans "Connectez-vous à Salesforce pour accéder à cette fonctionnalité." %}</p>
+                        {% else %}
+                        <form method="post" action="{% url 'create_import_file_generate' %}" id="create-form">
+                        {% csrf_token %}
+                        <div class="obj-filter" style="margin-bottom: 0.75rem;">
+                            <input type="text" id="filter-objs" placeholder="{% trans 'Filtrer les objets...' %}" autocomplete="off" style="padding: 0.4rem 0.75rem; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--text); width: 100%; max-width: 300px;">
+                        </div>
+                        <div class="obj-actions" style="margin: 1rem 0;">
+                            <button type="button" class="btn btn-secondary" id="btn-select-all">{% trans "Tout sélectionner" %}</button>
+                            <button type="button" class="btn btn-secondary" id="btn-select-none">{% trans "Tout désélectionner" %}</button>
+                            <button type="button" class="btn btn-secondary" id="btn-select-standard">{% trans "Objets standard uniquement" %}</button>
+                            <button type="button" class="btn btn-secondary" id="btn-select-custom">{% trans "Objets personnalisés uniquement" %}</button>
+                        </div>
+                        <div class="obj-list" id="obj-list" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; background: var(--surface); margin: 1rem 0;">
+                            {% for obj in sobjects %}
+                            <label class="obj-item" data-name="{{ obj.name|lower }}" data-label="{{ obj.label|lower }}" data-custom="{{ obj.custom|yesno:'1,0' }}" style="display: block; padding: 0.35rem 0; cursor: pointer;">
+                                <input type="checkbox" name="objects" value="{{ obj.name }}" style="margin-right: 0.5rem;"> {{ obj.label }} ({{ obj.name }}){% if obj.custom %} <span style="background: rgba(88, 166, 255, 0.3); color: var(--accent); font-size: 0.65rem; padding: 0.1rem 0.35rem; margin-left: 0.5rem;">custom</span>{% endif %}
+                            </label>
+                            {% empty %}
+                            <p style="color: var(--muted);">{% trans "Aucun objet disponible. Connectez-vous à Salesforce." %}</p>
+                            {% endfor %}
+                        </div>
+                        <div style="margin-top: 1.5rem;">
+                            <button type="submit" class="btn" id="btn-generate" {% if not sobjects %}disabled{% endif %}>{% trans "Générer le fichier Excel" %}</button>
+                        </div>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div id="panel-preview" class="content-panel">
+                    <div class="card" style="max-width: none;">
+                        <h2 style="margin-top: 0;">{% trans "Prévisualisation" %}</h2>
+                        <iframe src="{% url 'preview' %}" style="width:100%; height:75vh; min-height:500px; border:1px solid var(--border); border-radius:6px; background:var(--surface);" title="{% trans 'Prévisualisation et import' %}"></iframe>
+                    </div>
+                </div>
+
+                <div id="panel-sf-login" class="content-panel">
+                    <div class="card" style="max-width: 700px;">
+                        <h2 style="margin-top: 0;">{% trans "Connexion Salesforce (sans Connected App)" %}</h2>
+                        <p style="color: var(--muted);">{% trans "Connectez-vous à Salesforce dans votre navigateur, puis récupérez votre Session ID pour l'utiliser ici." %}</p>
+                        <h3 style="margin-top: 1.5rem;">{% trans "Étape 1 : Connexion web" %}</h3>
+                        <p>
+                            <a href="https://login.salesforce.com" target="_blank" rel="noopener" class="btn">{% trans "Ouvrir Salesforce (production)" %}</a>
+                            <a href="https://test.salesforce.com" target="_blank" rel="noopener" class="btn btn-secondary" style="margin-left: 0.5rem;">{% trans "Ouvrir Salesforce (sandbox)" %}</a>
+                        </p>
+                        <p style="font-size: 0.9rem; color: var(--muted);">{% trans "Une fois connecté, gardez l'onglet ouvert et revenez ici." %}</p>
+                        <h3 style="margin-top: 1.5rem;">{% trans "Étape 2 : Récupérer le Session ID" %}</h3>
+                        <details style="margin: 1rem 0;">
+                            <summary style="cursor: pointer; color: var(--accent);">{% trans "Alternative : Bookmarklet (sur une page Visualforce ou Classic)" %}</summary>
+                            <p style="margin-top: 0.5rem; font-size: 0.9rem;">Ouvrez d'abord <code>/services/data/</code> dans votre org, puis cliquez ce lien :</p>
+                            <a id="bookmarklet-explorer" href="#" style="display: inline-block; margin: 0.5rem 0; padding: 0.5rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--accent); text-decoration: none; font-size: 0.85rem; word-break: break-all;">{% trans "Récupérer ma session" %}</a>
+                            <p style="font-size: 0.8rem; color: var(--muted);">{% trans "Ne fonctionne pas avec Lightning." %}</p>
+                        </details>
+                        <details open style="margin: 1rem 0;">
+                            <summary style="cursor: pointer; color: var(--accent);">{% trans "Saisie manuelle" %}</summary>
+                            <p style="margin-top: 0.5rem; font-size: 0.9rem;">{% trans "Collez l'URL d'instance et le Session ID obtenus via la page Visualforce :" %}</p>
+                            <form method="post" action="{% url 'sf_login_submit' %}" style="margin-top: 1rem;">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{% url 'explorer' %}">
+                                <div style="margin-bottom: 1rem;">
+                                    <label for="instance_url" style="display: block; margin-bottom: 0.25rem;">{% trans "URL d'instance" %}</label>
+                                    <input type="text" id="instance_url" name="instance_url" required placeholder="https://na1.salesforce.com"
+                                           style="width: 100%; padding: 0.5rem; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
+                                </div>
+                                <div style="margin-bottom: 1rem;">
+                                    <label for="session_id" style="display: block; margin-bottom: 0.25rem;">{% trans "Session ID" %}</label>
+                                    <textarea id="session_id" name="session_id" required rows="3" placeholder="{% trans 'Coller le Session ID ici...' %}"
+                                              style="width: 100%; padding: 0.5rem; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-family: monospace; font-size: 0.85rem;"></textarea>
+                                </div>
+                                <button type="submit" class="btn">{% trans "Enregistrer et se connecter" %}</button>
+                            </form>
+                        </details>
+                    </div>
+                </div>
+
+                <div id="panel-config" class="content-panel">
+                    {% if has_file %}
+                    <div class="config-view-tabs" id="config-view-tabs">
+                        <button type="button" class="config-view-tab active" data-view="table">{% trans "Vue tableau" %}</button>
+                        <button type="button" class="config-view-tab" data-view="graph">{% trans "Vue graphique" %}</button>
+                    </div>
+                    <h2>{% trans "Configuration" %}</h2>
+                    <div id="config-view-table-content">
+                        <div class="config-box">{% for line in config_summary %}{{ line }}
+{% endfor %}</div>
+                        <div class="config-editor" id="config-editor">
+                        <h3>{% trans "Ordre des onglets" %}</h3>
+                        <p class="help-text">{% trans "Définir l'ordre d'import et l'objet Salesforce pour chaque onglet." %}</p>
+                        <table id="config-sheets-table">
+                            <thead><tr>
+                                <th>{% trans "Onglet" %}</th><th>{% trans "Ordre" %}</th><th>{% trans "Objet Salesforce" %}</th><th>{% trans "Colonne ID" %}</th><th>{% trans "Mode" %}</th><th>{% trans "Champ Upsert" %}</th>
+                            </tr></thead>
+                            <tbody id="config-sheets-tbody">
+                            {% for row in config_sheet_rows %}
+                            <tr data-sheet-index="{{ forloop.counter0 }}">
+                                <td><select name="sheet_name" class="sheet-name-select" data-sheet-index="{{ forloop.counter0 }}">{% for sn in sheet_names %}<option value="{{ sn }}" {% if sn == row.name %}selected{% endif %}>{{ sn }}</option>{% endfor %}</select></td>
+                                <td><input type="number" name="sheet_order" min="1" value="{{ row.order }}" style="width:50px;"></td>
+                                <td>{% if sobjects %}<select name="salesforce_object" class="sf-object-select">{% for obj in sobjects %}<option value="{{ obj.name }}" {% if obj.name == row.salesforce_object %}selected{% endif %}>{{ obj.label }} ({{ obj.name }})</option>{% endfor %}</select>{% else %}<input type="text" name="salesforce_object" value="{{ row.salesforce_object }}" list="sf-objects-list" placeholder="Account..."><datalist id="sf-objects-list">{% for obj in common_sf_objects %}<option value="{{ obj }}">{% endfor %}</datalist>{% endif %}</td>
+                                <td><select name="id_column" class="id-column-select" data-sheet="{{ row.name }}">{% for col in row.columns %}<option value="{{ col }}" {% if col == row.id_column %}selected{% endif %}>{{ col }}</option>{% endfor %}</select></td>
+                                <td><select name="mode"><option value="insert" {% if row.mode == 'insert' %}selected{% endif %}>Insert</option><option value="update" {% if row.mode == 'update' %}selected{% endif %}>Update</option><option value="upsert" {% if row.mode == 'upsert' %}selected{% endif %}>Upsert</option></select></td>
+                                <td><input type="text" name="upsert_field" value="{{ row.upsert_field }}" placeholder="RefExterne__c"></td>
+                            </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        {% if connected and sobjects %}
+                        <button type="button" class="btn btn-sm btn-add" id="btn-add-sheet">+ {% trans "Ajouter un onglet" %}</button>
+                        {% endif %}
+                        <h3>{% trans "Correspondances" %}</h3>
+                        <p class="help-text">{% trans "Lier les colonnes entre onglets." %}</p>
+                        <table id="config-mappings-table">
+                            <thead><tr><th>{% trans "Onglet source" %}</th><th>{% trans "Colonne source" %}</th><th>{% trans "Onglet cible" %}</th><th>{% trans "Colonne cible" %}</th><th>{% trans "Champ Salesforce" %}</th><th></th></tr></thead>
+                            <tbody id="config-mappings-tbody">
+                            {% for m in config.mappings %}
+                            <tr><td><select class="sheet-select">{% for sn in sheet_names %}<option value="{{ sn }}" {% if sn == m.source_sheet %}selected{% endif %}>{{ sn }}</option>{% endfor %}</select></td>
+                            <td><select class="col-select" data-for-sheet="{{ m.source_sheet }}">{% for sn, cols in columns_by_sheet.items %}{% if sn == m.source_sheet %}{% for col in cols %}<option value="{{ col }}" {% if col == m.source_column %}selected{% endif %}>{{ col }}</option>{% endfor %}{% endif %}{% endfor %}</select></td>
+                            <td><select class="sheet-select">{% for sn in sheet_names %}<option value="{{ sn }}" {% if sn == m.target_sheet %}selected{% endif %}>{{ sn }}</option>{% endfor %}</select></td>
+                            <td><select class="col-select" data-for-sheet="{{ m.target_sheet }}">{% for sn, cols in columns_by_sheet.items %}{% if sn == m.target_sheet %}{% for col in cols %}<option value="{{ col }}" {% if col == m.target_column %}selected{% endif %}>{{ col }}</option>{% endfor %}{% endif %}{% endfor %}</select></td>
+                            <td><input type="text" name="mapping_sf_field" value="{{ m.target_salesforce_field|default:'' }}"></td>
+                            <td><button type="button" class="btn btn-sm btn-remove btn-remove-mapping">−</button></td></tr>
+                            {% empty %}
+                            <tr class="no-mappings-msg"><td colspan="6" style="color:var(--muted);">{% trans "Aucune correspondance" %}</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        <button type="button" class="btn btn-sm btn-add" id="btn-add-mapping">+ {% trans "Ajouter une correspondance" %}</button>
+                        <h3>{% trans "Colonnes pivot" %}</h3>
+                        <table id="config-pivot-table">
+                            <thead><tr><th>{% trans "Onglet" %}</th><th>{% trans "Colonne" %}</th><th></th></tr></thead>
+                            <tbody id="config-pivot-tbody">
+                            {% for p in config.pivot_columns %}
+                            <tr><td><select class="sheet-select">{% for sn in sheet_names %}<option value="{{ sn }}" {% if sn == p.sheet %}selected{% endif %}>{{ sn }}</option>{% endfor %}</select></td>
+                            <td><select class="col-select" data-for-sheet="{{ p.sheet }}">{% for sn, cols in columns_by_sheet.items %}{% if sn == p.sheet %}{% for col in cols %}<option value="{{ col }}" {% if col == p.column %}selected{% endif %}>{{ col }}</option>{% endfor %}{% endif %}{% endfor %}</select></td>
+                            <td><button type="button" class="btn btn-sm btn-remove btn-remove-pivot">−</button></td></tr>
+                            {% empty %}
+                            <tr class="no-pivot-msg"><td colspan="3" style="color:var(--muted);">{% trans "Aucune colonne pivot" %}</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        <button type="button" class="btn btn-sm btn-add" id="btn-add-pivot">+ {% trans "Ajouter une colonne pivot" %}</button>
+                        <p style="margin-top: 1rem;"><button type="button" class="btn" id="btn-save-config">{% trans "Enregistrer la configuration dans l'Excel" %}</button> <span id="config-save-message"></span></p>
+                        </div>
+                    </div>
+                    <div id="config-view-graph" class="config-graph-view">
+                        <div id="config-graph-container" class="config-graph-container"></div>
+                        <div id="config-graph-arrows" class="config-graph-arrows"></div>
+                        <div id="config-graph-tooltip" class="config-graph-tooltip" style="display:none;"></div>
+                    </div>
+                    {% else %}
+                    <p class="no-file-msg">{% trans "Chargez d'abord un fichier pour accéder à la configuration." %}</p>
+                    {% endif %}
+                </div>
+
+                <div id="modal-add-sheet" class="modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center; flex-direction:column;">
+                    <div class="modal-content" style="background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:1.5rem; max-width:400px; width:90%;">
+                        <h3 style="margin-top:0;">{% trans "Ajouter un onglet" %}</h3>
+                        <form id="form-add-sheet">
+                            <input type="hidden" name="parent_sheet" id="add-sheet-parent" value="">
+                            <div style="margin-bottom:1rem;">
+                                <label for="add-sheet-name" style="display:block; margin-bottom:0.25rem;">{% trans "Nom de l'onglet" %}</label>
+                                <input type="text" id="add-sheet-name" name="sheet_name" required placeholder="Contact" style="width:100%; padding:0.5rem; border-radius:4px; border:1px solid var(--border); background:var(--bg); color:var(--text);">
+                            </div>
+                            <div style="margin-bottom:1rem;">
+                                <label for="add-sheet-object" style="display:block; margin-bottom:0.25rem;">{% trans "Objet Salesforce" %}</label>
+                                <select id="add-sheet-object" name="salesforce_object" required style="width:100%; padding:0.5rem; border-radius:4px; border:1px solid var(--border); background:var(--bg); color:var(--text);">
+                                    {% for obj in sobjects %}
+                                    <option value="{{ obj.name }}">{{ obj.label }} ({{ obj.name }})</option>
+                                    {% empty %}
+                                    <option value="">{% trans "Connectez-vous à Salesforce" %}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+                                <button type="submit" class="btn">{% trans "Ajouter" %}</button>
+                                <button type="button" class="btn btn-secondary" id="btn-cancel-add-sheet">{% trans "Annuler" %}</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                {% for sheet in sheets_data %}
+                <div id="panel-sheet-{{ forloop.counter }}" class="content-panel" data-sheet-name="{{ sheet.name }}">
+                    <h2>{{ sheet.name }}</h2>
+                    <p class="sheet-meta"><span class="badge">{% trans "Ordre" %} {{ sheet.order }}</span> {% trans "Objet" %} : <strong>{% if sheet.object %}{{ sheet.object }}{% else %}{% trans "(non défini)" %}{% endif %}</strong> — {{ sheet.total_rows }} {% trans "lignes" %}</p>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr>{% for col in sheet.columns %}<th>{{ col }}</th>{% endfor %}</tr></thead>
+                            <tbody>{% for row in sheet.rows %}<tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+                        </table>
+                    </div>
+                    <p style="margin-top: 1rem;"><a href="{% url 'preview' %}" class="btn">{% trans "Voir la prévisualisation et lancer l'import" %}</a></p>
+                </div>
+                {% endfor %}
+            </main>
+        </div>
+    </div>
+
+    {% if messages %}{% for message in messages %}<div class="alert alert-{{ message.tags }}" style="position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:999;min-width:300px;">{{ message }}</div>{% endfor %}{% endif %}
+
+    <form id="import-form" style="display:none;">{% csrf_token %}</form>
+
+    <script>
+    var CONFIG_DATA = { sheet_names: {{ sheet_names_json|safe }}, columns_by_sheet: {{ columns_by_sheet_json|safe }} };
+    var CONFIG_GRAPH_DATA = {{ config_graph_json|safe }};
+    var SOBJECTS = {{ sobjects_json|safe }};
+    var TREE_NODES = {{ tree_json|safe }};
+    var I18N = { config_saved: "{% trans 'Configuration enregistrée.' %}", config_error: "{% trans 'Erreur' %}" };
+
+    document.querySelectorAll('.tree-item[data-panel]').forEach(function(el) {
+        el.addEventListener('click', function() {
+            var panel = this.dataset.panel;
+            if (this.classList.contains('tree-item-disabled')) return;
+            document.querySelectorAll('.tree-item').forEach(function(t) { t.classList.remove('active'); });
+            document.querySelectorAll('.tree-item-tree').forEach(function(t) { t.classList.remove('active'); });
+            this.classList.add('active');
+            document.querySelectorAll('.content-panel').forEach(function(p) { p.classList.remove('active'); });
+            var target = document.getElementById('panel-' + panel);
+            if (target) target.classList.add('active');
+        });
+    });
+    document.querySelectorAll('.btn-show-login').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var panel = this.dataset.panel;
+            document.querySelectorAll('.tree-item').forEach(function(t) { t.classList.remove('active'); });
+            document.querySelectorAll('.tree-item-tree').forEach(function(t) { t.classList.remove('active'); });
+            document.querySelectorAll('.content-panel').forEach(function(p) { p.classList.remove('active'); });
+            var target = document.getElementById('panel-' + (panel || 'sf-login'));
+            if (target) target.classList.add('active');
+        });
+    });
+
+    document.querySelectorAll('.tree-item-tree').forEach(function(el) {
+        el.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var sheetName = this.dataset.sheetName;
+            if (!sheetName) return;
+            document.querySelectorAll('.tree-item').forEach(function(t) { t.classList.remove('active'); });
+            document.querySelectorAll('.tree-item-tree').forEach(function(t) { t.classList.remove('active'); });
+            this.classList.add('active');
+            document.querySelectorAll('.content-panel').forEach(function(p) { p.classList.remove('active'); });
+            var target = document.querySelector('.content-panel[data-sheet-name="' + sheetName.replace(/"/g, '\\"') + '"]');
+            if (target) target.classList.add('active');
+        });
+    });
+
+    document.querySelectorAll('.tree-item.has-children .tree-toggle').forEach(function(toggle) {
+        toggle.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var item = this.closest('.tree-item');
+            var node = item.closest('.tree-node');
+            var children = node ? node.querySelector(':scope > .tree-children') : item.nextElementSibling;
+            if (children && children.classList.contains('tree-children')) {
+                item.classList.toggle('expanded');
+                children.style.display = item.classList.contains('expanded') ? 'block' : 'none';
+            }
+        });
+    });
+
+    function escapeHtml(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function makeSheetSelect(sel) { var h = '<select class="sheet-select">'; (CONFIG_DATA.sheet_names || []).forEach(function(s) { h += '<option value="'+escapeHtml(s)+'"'+(s===sel?' selected':'')+'>'+escapeHtml(s)+'</option>'; }); return h + '</select>'; }
+    function makeColSelect(sheet, col) { var cols = CONFIG_DATA.columns_by_sheet[sheet] || []; var h = '<select class="col-select" data-for-sheet="'+escapeHtml(sheet)+'">'; cols.forEach(function(c) { h += '<option value="'+escapeHtml(c)+'"'+(c===col?' selected':'')+'>'+escapeHtml(c)+'</option>'; }); return h + '</select>'; }
+
+    document.getElementById('btn-add-mapping')?.addEventListener('click', function() {
+        var tbody = document.getElementById('config-mappings-tbody');
+        var noMsg = tbody?.querySelector('.no-mappings-msg'); if (noMsg) noMsg.remove();
+        var fs = CONFIG_DATA.sheet_names[0] || '', fc = (CONFIG_DATA.columns_by_sheet[fs] || [])[0] || '';
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td>' + makeSheetSelect(fs) + '</td><td>' + makeColSelect(fs, fc) + '</td><td>' + makeSheetSelect(fs) + '</td><td>' + makeColSelect(fs, fc) + '</td><td><input type="text" name="mapping_sf_field"></td><td><button type="button" class="btn btn-sm btn-remove btn-remove-mapping">−</button></td>';
+        tbody?.appendChild(tr);
+        tr.querySelector('.btn-remove-mapping')?.addEventListener('click', function() { tr.remove(); });
+    });
+    document.getElementById('btn-add-pivot')?.addEventListener('click', function() {
+        var tbody = document.getElementById('config-pivot-tbody');
+        var noMsg = tbody?.querySelector('.no-pivot-msg'); if (noMsg) noMsg.remove();
+        var fs = CONFIG_DATA.sheet_names[0] || '', fc = (CONFIG_DATA.columns_by_sheet[fs] || [])[0] || '';
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td>' + makeSheetSelect(fs) + '</td><td>' + makeColSelect(fs, fc) + '</td><td><button type="button" class="btn btn-sm btn-remove btn-remove-pivot">−</button></td>';
+        tbody?.appendChild(tr);
+        tr.querySelector('.btn-remove-pivot')?.addEventListener('click', function() { tr.remove(); });
+    });
+    document.getElementById('config-editor')?.addEventListener('click', function(e) {
+        if (e.target.classList.contains('btn-remove-mapping') || e.target.classList.contains('btn-remove-pivot')) e.target.closest('tr').remove();
+    });
+    document.getElementById('config-editor')?.addEventListener('change', function(e) {
+        if (e.target.classList.contains('sheet-select')) {
+            var row = e.target.closest('tr');
+            var colSelect = row?.querySelector('.col-select[data-for-sheet]');
+            if (!colSelect) colSelect = row?.querySelector('.col-select');
+            if (colSelect) {
+                var sheet = e.target.value;
+                var cols = CONFIG_DATA.columns_by_sheet[sheet] || [];
+                var cur = colSelect.value;
+                colSelect.innerHTML = cols.map(function(c) { return '<option value="'+escapeHtml(c)+'"'+(c===cur?' selected':'')+'>'+escapeHtml(c)+'</option>'; }).join('');
+                colSelect.dataset.forSheet = sheet;
+            }
+        }
+        if (e.target.classList.contains('sheet-name-select')) {
+            var row = e.target.closest('tr');
+            var idSel = row?.querySelector('.id-column-select');
+            if (idSel) {
+                var sheet = e.target.value;
+                var cols = CONFIG_DATA.columns_by_sheet[sheet] || [];
+                var cur = idSel.value;
+                idSel.innerHTML = cols.map(function(c) { return '<option value="'+escapeHtml(c)+'"'+(cols.indexOf(cur)>=0&&c===cur?' selected':'')+'>'+escapeHtml(c)+'</option>'; }).join('');
+                idSel.dataset.sheet = sheet;
+            }
+        }
+    });
+
+    document.getElementById('btn-save-config')?.addEventListener('click', async function() {
+        var btn = this, msg = document.getElementById('config-save-message');
+        btn.disabled = true; msg.textContent = '';
+        var sheets = []; document.querySelectorAll('#config-sheets-tbody tr').forEach(function(tr) {
+            var ns = tr.querySelector('.sheet-name-select'), oi = tr.querySelector('input[name="sheet_order"]'), obj = tr.querySelector('input[name="salesforce_object"]'), idc = tr.querySelector('.id-column-select'), ms = tr.querySelector('select[name="mode"]'), uf = tr.querySelector('input[name="upsert_field"]');
+            if (ns) sheets.push({ name: ns.value, order: parseInt(oi?.value||1,10), salesforce_object: obj?.value||'', id_column: idc?.value||'Id', mode: ms?.value||'insert', upsert_external_id_field: uf?.value||null });
+        });
+        var mappings = []; document.querySelectorAll('#config-mappings-tbody tr').forEach(function(tr) {
+            if (tr.classList.contains('no-mappings-msg')) return;
+            var ss = tr.querySelectorAll('.sheet-select'), cs = tr.querySelectorAll('.col-select'), sf = tr.querySelector('input[name="mapping_sf_field"]');
+            if (ss[0]?.value && cs[0]?.value && ss[1]?.value && cs[1]?.value) mappings.push({ source_sheet: ss[0].value, source_column: cs[0].value, target_sheet: ss[1].value, target_column: cs[1].value, target_salesforce_field: sf?.value||null });
+        });
+        var pivot = []; document.querySelectorAll('#config-pivot-tbody tr').forEach(function(tr) {
+            if (tr.classList.contains('no-pivot-msg')) return;
+            var sh = tr.querySelector('.sheet-select'), col = tr.querySelector('.col-select');
+            if (sh?.value && col?.value) pivot.push({ sheet: sh.value, column: col.value });
+        });
+        try {
+            var r = await fetch('{% url "save_config" %}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }, body: JSON.stringify({ sheets: sheets, mappings: mappings, pivot_columns: pivot }) });
+            var d = await r.json();
+            if (d.success) {
+                msg.textContent = I18N.config_saved; msg.style.color = 'var(--success)';
+                location.reload();
+            } else {
+                msg.textContent = (I18N.config_error || '') + ': ' + (d.error || ''); msg.style.color = 'var(--error)';
+            }
+        } catch (e) { msg.textContent = (I18N.config_error || '') + ': ' + e.message; msg.style.color = 'var(--error)'; }
+        btn.disabled = false;
+    });
+    document.getElementById('btn-refresh-tree')?.addEventListener('click', function() { location.reload(); });
+
+    (function() {
+        var graphData = window.CONFIG_GRAPH_DATA || { sheets: [], mappings: [], pivot_columns: [] };
+        var pivotSet = {};
+        var cardLayouts = {};
+        (graphData.pivot_columns || []).forEach(function(p) { pivotSet[p.sheet + '|' + p.column] = true; });
+        document.querySelectorAll('.config-view-tab').forEach(function(tab) {
+            tab.addEventListener('click', function() {
+                var view = this.dataset.view;
+                document.querySelectorAll('.config-view-tab').forEach(function(t) { t.classList.toggle('active', t.dataset.view === view); });
+                document.getElementById('config-view-table-content').style.display = view === 'table' ? 'block' : 'none';
+                var graphEl = document.getElementById('config-view-graph');
+                graphEl.classList.toggle('active', view === 'graph');
+                if (view === 'graph') renderConfigGraph();
+            });
+        });
+
+        var CARD_W = 220, CARD_H = 160, GAP = 20, COLS = 4;
+        var TOOLTIP_DELAY_MS = 600;
+        var tooltipTimer = null;
+        var pendingArrowSource = null;
+        var pendingArrowTarget = null;
+        var pendingArrowHintEl = null;
+
+        function buildFieldTooltips() {
+            var out = {};
+            (graphData.mappings || []).forEach(function(m) {
+                var keyS = m.source_sheet + '|' + m.source_column;
+                var keyT = m.target_sheet + '|' + m.target_column;
+                var txt = '{% trans "Champ parent" %}: ' + m.source_sheet + '.' + m.source_column + ' → {% trans "Champ enfant" %}: ' + m.target_sheet + '.' + m.target_column;
+                out[keyS] = (out[keyS] || '') + (out[keyS] ? '\n' : '') + txt;
+                out[keyT] = (out[keyT] || '') + (out[keyT] ? '\n' : '') + txt;
+            });
+            return out;
+        }
+
+        function setupFieldTooltip(fieldEl, tooltipText) {
+            fieldEl.addEventListener('mouseenter', function() {
+                tooltipTimer = setTimeout(function() {
+                    var tt = document.getElementById('config-graph-tooltip');
+                    if (tt) {
+                        tt.textContent = tooltipText;
+                        tt.style.display = 'block';
+                        var r = fieldEl.getBoundingClientRect();
+                        tt.style.left = (r.left + r.width / 2) + 'px';
+                        tt.style.top = (r.top - 4) + 'px';
+                        tt.style.transform = 'translate(-50%, -100%)';
+                    }
+                }, TOOLTIP_DELAY_MS);
+            });
+            fieldEl.addEventListener('mouseleave', function() {
+                if (tooltipTimer) { clearTimeout(tooltipTimer); tooltipTimer = null; }
+                var tt = document.getElementById('config-graph-tooltip');
+                if (tt) tt.style.display = 'none';
+            });
+        }
+
+        function defaultLayout(idx) {
+            var col = idx % COLS, row = Math.floor(idx / COLS);
+            return { left: GAP + col * (CARD_W + GAP), top: GAP + row * (CARD_H + GAP), width: CARD_W, height: CARD_H };
+        }
+
+        function applyLayout(card, sheetName) {
+            var L = cardLayouts[sheetName] || defaultLayout(0);
+            card.style.left = L.left + 'px';
+            card.style.top = L.top + 'px';
+            card.style.width = L.width + 'px';
+            card.style.height = L.height + 'px';
+        }
+
+        function renderConfigGraph() {
+            cancelPendingArrow();
+            var container = document.getElementById('config-graph-container');
+            var arrowsEl = document.getElementById('config-graph-arrows');
+            if (!container) return;
+            container.innerHTML = '';
+            var sheets = (graphData.sheets || []).slice().sort(function(a,b) { return (a.order||0) - (b.order||0); });
+            sheets.forEach(function(s, idx) {
+                var layout = cardLayouts[s.name] || defaultLayout(idx);
+                cardLayouts[s.name] = layout;
+                var card = document.createElement('div');
+                card.className = 'config-graph-card';
+                card.id = 'graph-card-' + (s.name || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+                card.dataset.sheetName = s.name;
+                applyLayout(card, s.name);
+                var header = document.createElement('div');
+                header.className = 'config-graph-card-header';
+                header.textContent = (s.name || '') + (s.object ? ' — ' + s.object : '');
+                card.appendChild(header);
+                var fieldsDiv = document.createElement('div');
+                fieldsDiv.className = 'config-graph-card-fields';
+                var fieldTooltips = buildFieldTooltips();
+                (s.columns || []).forEach(function(col) {
+                    var f = document.createElement('div');
+                    f.className = 'config-graph-field' + (pivotSet[s.name + '|' + col] ? ' pivot' : '');
+                    f.textContent = col;
+                    f.dataset.sheet = s.name;
+                    f.dataset.column = col;
+                    var tt = fieldTooltips[s.name + '|' + col];
+                    if (tt) setupFieldTooltip(f, tt);
+                    f.addEventListener('contextmenu', function(e) {
+                        e.preventDefault();
+                        cancelPendingArrow();
+                        var menu = document.getElementById('ctx-field-pivot');
+                        if (menu) menu.remove();
+                        menu = document.createElement('div');
+                        menu.id = 'ctx-field-pivot';
+                        menu.style.cssText = 'position:fixed; left:'+e.clientX+'px; top:'+e.clientY+'px; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0; min-width:260px; z-index:1002; box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+                        var btnStyle = 'display:block; width:100%; padding:0.5rem 1rem; text-align:left; background:none; border:none; color:var(--text); cursor:pointer; font-size:0.9rem;';
+                        var isPivot = pivotSet[s.name + '|' + col];
+                        var btnPivot = document.createElement('button');
+                        btnPivot.type = 'button';
+                        btnPivot.style.cssText = btnStyle;
+                        btnPivot.textContent = isPivot ? '{% trans "Retirer des colonnes pivot" %}' : '{% trans "Ajouter aux colonnes pivot" %}';
+                        btnPivot.addEventListener('click', function() { menu.remove(); togglePivot(s.name, col, !isPivot); });
+                        menu.appendChild(btnPivot);
+                        var sep1 = document.createElement('div');
+                        sep1.style.cssText = 'height:1px; background:var(--border); margin:0.2rem 0;';
+                        menu.appendChild(sep1);
+                        var btnStart = document.createElement('button');
+                        btnStart.type = 'button';
+                        btnStart.style.cssText = btnStyle;
+                        btnStart.textContent = '{% trans "Définir comme début de flèche" %}';
+                        btnStart.addEventListener('click', function() {
+                            menu.remove();
+                            pendingArrowSource = { sheet: s.name, column: col };
+                            pendingArrowTarget = null;
+                            showPendingArrowHint('{% trans "Cliquez sur le champ cible (autre onglet)" %}');
+                            setupArrowTargetListener();
+                        });
+                        menu.appendChild(btnStart);
+                        var btnEnd = document.createElement('button');
+                        btnEnd.type = 'button';
+                        btnEnd.style.cssText = btnStyle;
+                        btnEnd.textContent = '{% trans "Définir comme fin de flèche" %}';
+                        btnEnd.addEventListener('click', function() {
+                            menu.remove();
+                            pendingArrowTarget = { sheet: s.name, column: col };
+                            pendingArrowSource = null;
+                            showPendingArrowHint('{% trans "Cliquez sur le champ source (autre onglet)" %}');
+                            setupArrowSourceListener();
+                        });
+                        menu.appendChild(btnEnd);
+                        var fieldMappings = getMappingsForField(s.name, col);
+                        if (fieldMappings.length > 0) {
+                            var sep2 = document.createElement('div');
+                            sep2.style.cssText = 'height:1px; background:var(--border); margin:0.2rem 0;';
+                            menu.appendChild(sep2);
+                            fieldMappings.forEach(function(m) {
+                                var btnDel = document.createElement('button');
+                                btnDel.type = 'button';
+                                btnDel.style.cssText = btnStyle + ' color:var(--error);';
+                                btnDel.textContent = '{% trans "Supprimer la flèche" %}: ' + m.source_sheet + '.' + m.source_column + ' → ' + m.target_sheet + '.' + m.target_column;
+                                btnDel.addEventListener('click', function() {
+                                    menu.remove();
+                                    removeMapping(m.source_sheet, m.source_column, m.target_sheet, m.target_column);
+                                });
+                                menu.appendChild(btnDel);
+                            });
+                        }
+                        document.body.appendChild(menu);
+                        setTimeout(function() { document.addEventListener('click', function rm() { if (menu.parentNode) menu.remove(); document.removeEventListener('click', rm); }); }, 50);
+                    });
+                    fieldsDiv.appendChild(f);
+                });
+                card.appendChild(fieldsDiv);
+                var resizeHandle = document.createElement('div');
+                resizeHandle.className = 'config-graph-card-resize';
+                resizeHandle.title = '{% trans "Redimensionner" %}';
+                card.appendChild(resizeHandle);
+                container.appendChild(card);
+                setupCardDrag(card, s.name);
+                setupCardResize(card, s.name);
+                card.addEventListener('contextmenu', function(e) {
+                    if (e.target.closest('.config-graph-field')) return;
+                    e.preventDefault();
+                    var oldMenu = document.getElementById('ctx-sheet-card');
+                    if (oldMenu) oldMenu.remove();
+                    var menu = document.createElement('div');
+                    menu.id = 'ctx-sheet-card';
+                    menu.style.cssText = 'position:fixed; left:'+e.clientX+'px; top:'+e.clientY+'px; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0; min-width:200px; z-index:1002; box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+                    var btnStyle = 'display:block; width:100%; padding:0.5rem 1rem; text-align:left; background:none; border:none; color:var(--text); cursor:pointer; font-size:0.9rem;';
+                    var btnDel = document.createElement('button');
+                    btnDel.type = 'button';
+                    btnDel.style.cssText = btnStyle + ' color:var(--error);';
+                    btnDel.textContent = '{% trans "Supprimer cet onglet" %}';
+                    btnDel.addEventListener('click', function() {
+                        menu.remove();
+                        if (!confirm('{% trans "Supprimer définitivement cet onglet ?" %}')) return;
+                        fetch('{% url "delete_sheet" %}', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+                            body: JSON.stringify({ sheet_name: s.name })
+                        }).then(function(r) { return r.json(); }).then(function(d) {
+                            if (d.success) location.reload();
+                            else alert(d.error || 'Erreur');
+                        }).catch(function(err) { alert(err.message); });
+                    });
+                    menu.appendChild(btnDel);
+                    document.body.appendChild(menu);
+                    setTimeout(function() { document.addEventListener('click', function rm() { if (menu.parentNode) menu.remove(); document.removeEventListener('click', rm); }); }, 50);
+                });
+            });
+            requestAnimationFrame(function() { drawMappingArrows(); });
+        }
+
+        function setupCardDrag(card, sheetName) {
+            var header = card.querySelector('.config-graph-card-header');
+            if (!header) return;
+            var startX, startY, startLeft, startTop;
+            header.addEventListener('mousedown', function(e) {
+                if (e.button !== 0) return;
+                e.preventDefault();
+                startX = e.clientX; startY = e.clientY;
+                startLeft = parseInt(card.style.left, 10) || 0;
+                startTop = parseInt(card.style.top, 10) || 0;
+                card.style.zIndex = '10';
+                function onMove(e) {
+                    var dx = e.clientX - startX, dy = e.clientY - startY;
+                    var L = cardLayouts[sheetName] || { width: CARD_W, height: CARD_H };
+                    L.left = Math.max(0, startLeft + dx);
+                    L.top = Math.max(0, startTop + dy);
+                    L.width = L.width || parseInt(card.style.width, 10) || CARD_W;
+                    L.height = L.height || parseInt(card.style.height, 10) || CARD_H;
+                    cardLayouts[sheetName] = L;
+                    card.style.left = L.left + 'px';
+                    card.style.top = L.top + 'px';
+                    drawMappingArrows();
+                }
+                function onUp() {
+                    card.style.zIndex = '';
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                }
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+        }
+
+        function setupCardResize(card, sheetName) {
+            var handle = card.querySelector('.config-graph-card-resize');
+            if (!handle) return;
+            var startX, startY, startW, startH, startLeft, startTop;
+            handle.addEventListener('mousedown', function(e) {
+                if (e.button !== 0) return;
+                e.preventDefault();
+                e.stopPropagation();
+                startX = e.clientX; startY = e.clientY;
+                startW = parseInt(card.style.width, 10) || CARD_W;
+                startH = parseInt(card.style.height, 10) || CARD_H;
+                startLeft = parseInt(card.style.left, 10) || 0;
+                startTop = parseInt(card.style.top, 10) || 0;
+                function onMove(e) {
+                    var dw = e.clientX - startX, dh = e.clientY - startY;
+                    var nw = Math.max(180, startW + dw);
+                    var nh = Math.max(120, startH + dh);
+                    var L = cardLayouts[sheetName] || {};
+                    L.left = startLeft; L.top = startTop;
+                    L.width = nw; L.height = nh;
+                    cardLayouts[sheetName] = L;
+                    card.style.width = nw + 'px';
+                    card.style.height = nh + 'px';
+                    drawMappingArrows();
+                }
+                function onUp() {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                }
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+        }
+
+        function findFieldElement(container, sheetName, columnName) {
+            var found = null;
+            function matches(colA, colB) {
+                if (colA === colB) return true;
+                var a = (colA || '').replace(/__c$/, '_c');
+                var b = (colB || '').replace(/__c$/, '_c');
+                return a === b;
+            }
+            container.querySelectorAll('.config-graph-field').forEach(function(el) {
+                if (el.dataset.sheet === sheetName && matches(el.dataset.column, columnName)) found = el;
+            });
+            return found;
+        }
+
+        function drawMappingArrows() {
+            var arrowsEl = document.getElementById('config-graph-arrows');
+            var container = document.getElementById('config-graph-container');
+            if (!arrowsEl || !container) return;
+            var parent = arrowsEl.parentElement;
+            var pRect = parent ? parent.getBoundingClientRect() : arrowsEl.getBoundingClientRect();
+            var w = pRect.width || 1, h = pRect.height || 1;
+            var html = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none"><defs><marker id="arrowhead" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0 0, 8 4, 0 8" fill="var(--accent)"/></marker></defs>';
+            (graphData.mappings || []).forEach(function(m) {
+                var srcField = findFieldElement(container, m.source_sheet, m.source_column);
+                var tgtField = findFieldElement(container, m.target_sheet, m.target_column);
+                var sRect, tRect;
+                if (srcField && tgtField) {
+                    sRect = srcField.getBoundingClientRect();
+                    tRect = tgtField.getBoundingClientRect();
+                } else {
+                    var srcCard = null, tgtCard = null;
+                    container.querySelectorAll('.config-graph-card').forEach(function(c) {
+                        if (c.dataset.sheetName === m.source_sheet) srcCard = c;
+                        if (c.dataset.sheetName === m.target_sheet) tgtCard = c;
+                    });
+                    if (!srcCard || !tgtCard) return;
+                    sRect = srcCard.getBoundingClientRect();
+                    tRect = tgtCard.getBoundingClientRect();
+                }
+                var x1 = sRect.right - pRect.left;
+                var y1 = sRect.top + sRect.height / 2 - pRect.top;
+                var x2 = tRect.left - pRect.left;
+                var y2 = tRect.top + tRect.height / 2 - pRect.top;
+                var mid = (x1 + x2) / 2;
+                html += '<path d="M '+x1+' '+y1+' C '+mid+' '+y1+', '+mid+' '+y2+', '+x2+' '+y2+'" fill="none" stroke="var(--accent)" stroke-width="2" marker-end="url(#arrowhead)" opacity="0.85"/>';
+            });
+            html += '</svg>';
+            arrowsEl.innerHTML = html;
+        }
+        function getSheetsPayload() {
+            return (graphData.sheets || []).map(function(s) {
+                return { name: s.name, order: s.order || 0, salesforce_object: s.object || '', id_column: s.id_column || 'Id', mode: s.mode || 'insert', upsert_external_id_field: s.upsert_field || null };
+            });
+        }
+        function getMappingsPayload() {
+            return (graphData.mappings || []).map(function(m) {
+                return { source_sheet: m.source_sheet, source_column: m.source_column, target_sheet: m.target_sheet, target_column: m.target_column, target_salesforce_field: m.target_salesforce_field || null };
+            });
+        }
+        function saveFullConfig(mappings, onSuccess) {
+            var payload = { sheets: getSheetsPayload(), mappings: mappings || getMappingsPayload(), pivot_columns: graphData.pivot_columns || [] };
+            fetch('{% url "save_config" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+                body: JSON.stringify(payload)
+            }).then(function(r) { return r.json(); }).then(function(d) {
+                if (d.success) { if (onSuccess) onSuccess(); renderConfigGraph(); }
+                else alert(d.error || 'Erreur');
+            }).catch(function(err) { alert(err.message); });
+        }
+        function togglePivot(sheetName, column, add) {
+            var pivot = (graphData.pivot_columns || []).filter(function(p) { return !(p.sheet === sheetName && p.column === column); });
+            if (add) pivot.push({ sheet: sheetName, column: column });
+            graphData.pivot_columns = pivot;
+            pivotSet = {};
+            pivot.forEach(function(p) { pivotSet[p.sheet + '|' + p.column] = true; });
+            saveFullConfig(null, function() { graphData.pivot_columns = pivot; });
+        }
+        function cancelPendingArrow() {
+            pendingArrowSource = null;
+            pendingArrowTarget = null;
+            if (pendingArrowHintEl && pendingArrowHintEl.parentNode) pendingArrowHintEl.remove();
+            pendingArrowHintEl = null;
+        }
+        function showPendingArrowHint(msg) {
+            if (pendingArrowHintEl && pendingArrowHintEl.parentNode) pendingArrowHintEl.remove();
+            pendingArrowHintEl = document.createElement('div');
+            pendingArrowHintEl.className = 'config-graph-pending-hint';
+            pendingArrowHintEl.textContent = msg;
+            pendingArrowHintEl.style.cssText = 'position:fixed; left:50%; top:12px; transform:translateX(-50%); background:var(--accent); color:var(--bg); padding:0.5rem 1rem; border-radius:6px; z-index:1004; font-size:0.9rem; box-shadow:0 2px 8px rgba(0,0,0,0.3);';
+            document.body.appendChild(pendingArrowHintEl);
+        }
+        function addMapping(sourceSheet, sourceCol, targetSheet, targetCol) {
+            var m = { source_sheet: sourceSheet, source_column: sourceCol, target_sheet: targetSheet, target_column: targetCol, target_salesforce_field: null };
+            var mappings = getMappingsPayload();
+            var exists = mappings.some(function(x) { return x.source_sheet === sourceSheet && x.source_column === sourceCol && x.target_sheet === targetSheet && x.target_column === targetCol; });
+            if (exists) return;
+            mappings.push(m);
+            graphData.mappings = mappings;
+            saveFullConfig(mappings);
+        }
+        function removeMapping(sourceSheet, sourceCol, targetSheet, targetCol) {
+            var mappings = (graphData.mappings || []).filter(function(m) {
+                return !(m.source_sheet === sourceSheet && m.source_column === sourceCol && m.target_sheet === targetSheet && m.target_column === targetCol);
+            });
+            graphData.mappings = mappings;
+            saveFullConfig(mappings.map(function(m) { return { source_sheet: m.source_sheet, source_column: m.source_column, target_sheet: m.target_sheet, target_column: m.target_column, target_salesforce_field: m.target_salesforce_field || null }; }));
+        }
+        function getMappingsForField(sheetName, columnName) {
+            return (graphData.mappings || []).filter(function(m) {
+                return (m.source_sheet === sheetName && m.source_column === columnName) || (m.target_sheet === sheetName && m.target_column === columnName);
+            });
+        }
+        function setupArrowTargetListener() {
+            var handler = function(e) {
+                var field = e.target.closest('.config-graph-field');
+                if (!field || !field.dataset.sheet || !field.dataset.column) return;
+                if (pendingArrowSource && field.dataset.sheet !== pendingArrowSource.sheet) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    addMapping(pendingArrowSource.sheet, pendingArrowSource.column, field.dataset.sheet, field.dataset.column);
+                    cancelPendingArrow();
+                    container.removeEventListener('click', handler);
+                    document.removeEventListener('keydown', escHandler);
+                }
+            };
+            var escHandler = function(e) { if (e.key === 'Escape') { cancelPendingArrow(); container.removeEventListener('click', handler); document.removeEventListener('keydown', escHandler); } };
+            var container = document.getElementById('config-graph-container');
+            if (container) {
+                setTimeout(function() { container.addEventListener('click', handler); document.addEventListener('keydown', escHandler); }, 100);
+            }
+        }
+        function setupArrowSourceListener() {
+            var handler = function(e) {
+                var field = e.target.closest('.config-graph-field');
+                if (!field || !field.dataset.sheet || !field.dataset.column) return;
+                if (pendingArrowTarget && field.dataset.sheet !== pendingArrowTarget.sheet) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    addMapping(field.dataset.sheet, field.dataset.column, pendingArrowTarget.sheet, pendingArrowTarget.column);
+                    cancelPendingArrow();
+                    container.removeEventListener('click', handler);
+                    document.removeEventListener('keydown', escHandler);
+                }
+            };
+            var escHandler = function(e) { if (e.key === 'Escape') { cancelPendingArrow(); container.removeEventListener('click', handler); document.removeEventListener('keydown', escHandler); } };
+            var container = document.getElementById('config-graph-container');
+            if (container) {
+                setTimeout(function() { container.addEventListener('click', handler); document.addEventListener('keydown', escHandler); }, 100);
+            }
+        }
+    })();
+
+    (function() {
+        var modal = document.getElementById('modal-add-sheet');
+        var form = document.getElementById('form-add-sheet');
+        var parentInput = document.getElementById('add-sheet-parent');
+        var nameInput = document.getElementById('add-sheet-name');
+        var objectSelect = document.getElementById('add-sheet-object');
+        function showAddSheetModal(parent) {
+            parentInput.value = parent || '';
+            nameInput.value = '';
+            if (modal) {
+                modal.style.display = 'flex';
+                nameInput.focus();
+            }
+        }
+        function hideAddSheetModal() {
+            if (modal) modal.style.display = 'none';
+        }
+        document.getElementById('btn-add-sheet')?.addEventListener('click', function() {
+            showAddSheetModal('');
+        });
+        document.getElementById('btn-cancel-add-sheet')?.addEventListener('click', hideAddSheetModal);
+        modal?.addEventListener('click', function(e) {
+            if (e.target === modal) hideAddSheetModal();
+        });
+        form?.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            var name = nameInput.value.trim() || objectSelect.value;
+            var obj = objectSelect.value;
+            if (!obj) return;
+            var payload = { sheet_name: name, salesforce_object: obj };
+            if (parentInput.value) payload.parent_sheet = parentInput.value;
+            try {
+                var r = await fetch('{% url "add_sheet" %}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+                    body: JSON.stringify(payload)
+                });
+                var d = await r.json();
+                if (d.success) { hideAddSheetModal(); location.reload(); }
+                else alert(d.error || 'Erreur');
+            } catch (err) { alert(err.message); }
+        });
+        var contentItem = document.getElementById('tree-item-content');
+        if (contentItem) {
+            contentItem.addEventListener('contextmenu', function(e) {
+                e.preventDefault();
+                var oldMenu = document.getElementById('tree-context-menu');
+                if (oldMenu) oldMenu.remove();
+                var menu = document.createElement('div');
+                menu.id = 'tree-context-menu';
+                menu.style.cssText = 'position:fixed; left:'+e.clientX+'px; top:'+e.clientY+'px; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0; min-width:180px; z-index:1001; box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+                var btnAdd = document.createElement('button');
+                btnAdd.type = 'button';
+                btnAdd.style.cssText = 'display:block; width:100%; padding:0.5rem 1rem; text-align:left; background:none; border:none; color:var(--text); cursor:pointer; font-size:0.9rem;';
+                btnAdd.textContent = '{% trans "Ajouter un onglet" %}';
+                btnAdd.addEventListener('click', function(ev) { ev.stopPropagation(); menu.remove(); document.getElementById('btn-add-sheet')?.click(); });
+                menu.appendChild(btnAdd);
+                document.body.appendChild(menu);
+                var closeMenu = function() { if (menu.parentNode) menu.remove(); document.removeEventListener('click', closeMenu); };
+                setTimeout(function() { document.addEventListener('click', closeMenu); }, 50);
+            });
+        }
+        document.querySelectorAll('.tree-item-tree').forEach(function(el) {
+            el.addEventListener('contextmenu', function(e) {
+                e.preventDefault();
+                var sheetName = el.dataset.sheetName;
+                if (!sheetName) return;
+                var oldMenu = document.getElementById('tree-context-menu');
+                if (oldMenu) oldMenu.remove();
+                var menu = document.createElement('div');
+                menu.id = 'tree-context-menu';
+                menu.style.cssText = 'position:fixed; left:'+e.clientX+'px; top:'+e.clientY+'px; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0; min-width:180px; z-index:1001; box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'ctx-add-child';
+                btn.style.cssText = 'display:block; width:100%; padding:0.5rem 1rem; text-align:left; background:none; border:none; color:var(--text); cursor:pointer; font-size:0.9rem;';
+                btn.textContent = '{% trans "Ajouter un onglet enfant" %}';
+                btn.addEventListener('click', function(ev) { ev.stopPropagation(); menu.remove(); showAddSheetModal(sheetName); });
+                menu.appendChild(btn);
+                var btnRename = document.createElement('button');
+                btnRename.type = 'button';
+                btnRename.style.cssText = 'display:block; width:100%; padding:0.5rem 1rem; text-align:left; background:none; border:none; color:var(--text); cursor:pointer; font-size:0.9rem;';
+                btnRename.textContent = "{% trans 'Renommer cet onglet' %}";
+                btnRename.addEventListener('click', function(ev) {
+                    ev.stopPropagation();
+                    menu.remove();
+                    var newName = prompt("{% trans 'Nouveau nom de l\'onglet' %}", sheetName);
+                    if (newName !== null && newName.trim() !== '') {
+                        fetch('{% url "rename_sheet" %}', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+                            body: JSON.stringify({ old_name: sheetName, new_name: newName.trim().substring(0, 31) })
+                        }).then(function(r) { return r.json(); }).then(function(d) {
+                            if (d.success) location.reload();
+                            else alert(d.error || 'Erreur');
+                        }).catch(function(err) { alert(err.message); });
+                    }
+                });
+                menu.appendChild(btnRename);
+                if (sheetName !== '_Config_') {
+                    var sep = document.createElement('div');
+                    sep.style.cssText = 'height:1px; background:var(--border); margin:0.2rem 0;';
+                    menu.appendChild(sep);
+                    var btnDel = document.createElement('button');
+                    btnDel.type = 'button';
+                    btnDel.style.cssText = 'display:block; width:100%; padding:0.5rem 1rem; text-align:left; background:none; border:none; color:var(--error); cursor:pointer; font-size:0.9rem;';
+                    btnDel.textContent = '{% trans "Supprimer cet onglet" %}';
+                    btnDel.addEventListener('click', function(ev) {
+                        ev.stopPropagation();
+                        menu.remove();
+                        if (!confirm('{% trans "Supprimer définitivement cet onglet ?" %}')) return;
+                        fetch('{% url "delete_sheet" %}', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+                            body: JSON.stringify({ sheet_name: sheetName })
+                        }).then(function(r) { return r.json(); }).then(function(d) {
+                            if (d.success) location.reload();
+                            else alert(d.error || 'Erreur');
+                        }).catch(function(err) { alert(err.message); });
+                    });
+                    menu.appendChild(btnDel);
+                }
+                document.body.appendChild(menu);
+                var closeMenu = function() { if (menu.parentNode) menu.remove(); document.removeEventListener('click', closeMenu); };
+                setTimeout(function() { document.addEventListener('click', closeMenu); }, 50);
+            });
+        });
+        var configItem = document.getElementById('tree-item-config');
+        if (configItem && !configItem.classList.contains('tree-item-disabled')) {
+            configItem.addEventListener('contextmenu', function(e) {
+                e.preventDefault();
+                var oldMenu = document.getElementById('tree-context-menu');
+                if (oldMenu) oldMenu.remove();
+                var menu = document.createElement('div');
+                menu.id = 'tree-context-menu';
+                menu.style.cssText = 'position:fixed; left:'+e.clientX+'px; top:'+e.clientY+'px; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0; min-width:220px; z-index:1001; box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+                var btnReset = document.createElement('button');
+                btnReset.type = 'button';
+                btnReset.style.cssText = 'display:block; width:100%; padding:0.5rem 1rem; text-align:left; background:none; border:none; color:var(--text); cursor:pointer; font-size:0.9rem;';
+                btnReset.textContent = '{% trans "Commencer une nouvelle configuration" %}';
+                btnReset.addEventListener('click', function(ev) {
+                    ev.stopPropagation();
+                    menu.remove();
+                    fetch('{% url "reset_config" %}', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+                        body: JSON.stringify({})
+                    }).then(function(r) { return r.json(); }).then(function(d) {
+                        if (d.success) location.reload();
+                        else alert(d.error || 'Erreur');
+                    }).catch(function(err) { alert(err.message); });
+                });
+                menu.appendChild(btnReset);
+                var btnAdd = document.createElement('button');
+                btnAdd.type = 'button';
+                btnAdd.style.cssText = 'display:block; width:100%; padding:0.5rem 1rem; text-align:left; background:none; border:none; color:var(--text); cursor:pointer; font-size:0.9rem;';
+                btnAdd.textContent = '{% trans "Ajouter un onglet" %}';
+                btnAdd.addEventListener('click', function(ev) { ev.stopPropagation(); menu.remove(); document.getElementById('btn-add-sheet')?.click(); });
+                menu.appendChild(btnAdd);
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.style.cssText = 'display:block; width:100%; padding:0.5rem 1rem; text-align:left; background:none; border:none; color:var(--text); cursor:pointer; font-size:0.9rem;';
+                btn.textContent = '{% trans "Exporter la configuration et les onglets" %}';
+                btn.addEventListener('click', function(ev) {
+                    ev.stopPropagation();
+                    menu.remove();
+                    var a = document.createElement('a');
+                    a.href = '{% url "export_config" %}';
+                    a.download = 'export_configuration.xlsx';
+                    a.style.display = 'none';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                });
+                menu.appendChild(btn);
+                var btnGraph = document.createElement('button');
+                btnGraph.type = 'button';
+                btnGraph.style.cssText = 'display:block; width:100%; padding:0.5rem 1rem; text-align:left; background:none; border:none; color:var(--text); cursor:pointer; font-size:0.9rem;';
+                btnGraph.textContent = '{% trans "Vue graphique" %}';
+                btnGraph.addEventListener('click', function(ev) {
+                    ev.stopPropagation();
+                    menu.remove();
+                    document.querySelector('.config-view-tab[data-view="graph"]')?.click();
+                    document.querySelector('.tree-item[data-panel="config"]')?.click();
+                });
+                menu.appendChild(btnGraph);
+                document.body.appendChild(menu);
+                var closeMenu = function() { if (menu.parentNode) menu.remove(); document.removeEventListener('click', closeMenu); };
+                setTimeout(function() { document.addEventListener('click', closeMenu); }, 50);
+            });
+        }
+    })();
+
+    (function() {
+        var callbackBase = "{{ request.scheme }}://{{ request.get_host }}{% url 'sf_callback' %}?next={% url 'explorer' %}";
+        var bookmarkletEl = document.getElementById('bookmarklet-explorer');
+        if (bookmarkletEl) {
+            var js = "javascript:(function(){var m=document.cookie.match(/sid=([^;]+)/);var sid=m?m[1]:'';var h=window.location.hostname;var inst='https://'+h;if(sid){window.location=\"" + callbackBase + "&sid=\"+encodeURIComponent(sid)+\"&instance=\"+encodeURIComponent(inst);}else{alert('Session non trouvée. Connectez-vous à Salesforce ou utilisez la saisie manuelle.');}})();";
+            bookmarkletEl.href = js;
+        }
+    })();
+
+    (function() {
+        var filterInput = document.getElementById('filter-objs');
+        var list = document.getElementById('obj-list');
+        var items = list ? list.querySelectorAll('.obj-item') : [];
+        if (filterInput) filterInput.addEventListener('input', function() {
+            var q = this.value.toLowerCase();
+            items.forEach(function(lbl) {
+                var name = lbl.dataset.name || '', labelText = lbl.dataset.label || '';
+                lbl.style.display = (!q || name.indexOf(q) >= 0 || labelText.indexOf(q) >= 0) ? '' : 'none';
+            });
+        });
+        document.getElementById('btn-select-all')?.addEventListener('click', function() {
+            items.forEach(function(l) { if (l.style.display !== 'none') l.querySelector('input') && (l.querySelector('input').checked = true); });
+        });
+        document.getElementById('btn-select-none')?.addEventListener('click', function() {
+            items.forEach(function(l) { l.querySelector('input') && (l.querySelector('input').checked = false); });
+        });
+        document.getElementById('btn-select-standard')?.addEventListener('click', function() {
+            items.forEach(function(l) { var inp = l.querySelector('input'); if (inp) inp.checked = l.dataset.custom === '0'; });
+        });
+        document.getElementById('btn-select-custom')?.addEventListener('click', function() {
+            items.forEach(function(l) { var inp = l.querySelector('input'); if (inp) inp.checked = l.dataset.custom === '1'; });
+        });
+    })();
+    </script>
+</body>
+</html>

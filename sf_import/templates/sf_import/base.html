@@ -1,0 +1,154 @@
+{% load i18n %}
+<!DOCTYPE html>
+<html lang="{% get_current_language as lang %}{{ lang }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Import Salesforce{% endblock %}</title>
+    <style>
+        :root {
+            --bg: #0f1419;
+            --surface: #1a2332;
+            --border: #2d3a4d;
+            --text: #e6edf3;
+            --muted: #8b949e;
+            --accent: #58a6ff;
+            --success: #3fb950;
+            --error: #f85149;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+        .layout {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        h1 { font-size: 1.5rem; font-weight: 600; margin: 0; }
+        nav a {
+            color: var(--accent);
+            text-decoration: none;
+            margin-left: 1rem;
+        }
+        nav a:hover { text-decoration: underline; }
+        .btn {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: var(--accent);
+            color: var(--bg);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            text-decoration: none;
+        }
+        .btn:hover { opacity: 0.9; }
+        .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+        .badge-success { background: var(--success); color: var(--bg); }
+        .badge-muted { background: var(--border); color: var(--text); }
+        .alert {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+        .alert-error { background: rgba(248, 81, 73, 0.2); border: 1px solid var(--error); }
+        .alert-success { background: rgba(63, 185, 80, 0.2); border: 1px solid var(--success); }
+        .alert-info { background: rgba(88, 166, 255, 0.2); border: 1px solid var(--accent); }
+        .lang-btn {
+            background: transparent; border: 1px solid var(--border); color: var(--text);
+            padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.85rem;
+            border-radius: 4px; margin: 0 0.15rem;
+        }
+        .lang-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .lang-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+        nav .lang-switcher { flex-shrink: 0; margin-right: 1rem; }
+        .nav-dropdown {
+            padding: 0.4rem 2rem 0.4rem 0.75rem;
+            font-size: 0.9rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--surface);
+            color: var(--text);
+            cursor: pointer;
+            min-width: 160px;
+            -webkit-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.5rem center;
+        }
+        .nav-dropdown:focus { outline: none; border-color: var(--accent); }
+        .conn-indicator { font-size: 0.8rem; font-weight: 500; margin-left: 1rem; padding: 0.2rem 0.5rem; border-radius: 4px; }
+        .conn-indicator.connected { color: var(--success); background: rgba(63, 185, 80, 0.15); }
+        .conn-indicator.disconnected { color: var(--error); background: rgba(248, 81, 73, 0.15); }
+        {% block extra_css %}{% endblock %}
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <header>
+            <h1>{% trans "Import Salesforce" %}</h1>
+            <nav>
+                <span class="lang-switcher" style="font-size: 0.9rem;">
+                    <form action="{% url 'set_language' %}" method="post" style="display: inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" name="language" value="fr" class="lang-btn {% if LANGUAGE_CODE == 'fr' %}active{% endif %}">FR</button>
+                        <button type="submit" name="language" value="en" class="lang-btn {% if LANGUAGE_CODE == 'en' %}active{% endif %}">EN</button>
+                    </form>
+                </span>
+                <select class="nav-dropdown" id="nav-menu" onchange="var u=this.value;if(u){window.location=u;}">
+                    <option value="{% url 'index' %}" {% if current_url_name == 'index' or current_url_name == 'upload' %}selected{% endif %}>{% trans "Accueil" %}</option>
+                    <option value="{% url 'explorer' %}" {% if current_url_name == 'explorer' %}selected{% endif %}>{% trans "Explorateur" %}</option>
+                    <option value="{% url 'preview' %}" {% if current_url_name == 'preview' %}selected{% endif %}>{% trans "Prévisualisation" %}</option>
+                    <option value="{% url 'create_import_file' %}" {% if current_url_name == 'create_import_file' %}selected{% endif %}>{% trans "Créer un fichier pour import" %}</option>
+                    {% if connected %}
+                    <option value="{% url 'sf_logout' %}" {% if current_url_name == 'sf_logout' %}selected{% endif %}>{% trans "Déconnexion" %}</option>
+                    {% else %}
+                    <option value="{% url 'sf_login' %}" {% if current_url_name == 'sf_login' %}selected{% endif %}>{% trans "Connexion Salesforce" %}</option>
+                    {% endif %}
+                </select>
+                <span class="conn-indicator {% if connected %}connected{% else %}disconnected{% endif %}">
+                    {% if connected %}{% trans "Connecté" %}{% else %}{% trans "Déconnecté" %}{% endif %}
+                </span>
+                {% if connected %}
+                {% if sf_org_name or sf_org_id or sf_instance_url %}
+                <span class="sf-org-info" style="font-size: 0.85rem; margin-left: 0.75rem; color: var(--text);">
+                    Salesforce{% if sf_org_name %} — <strong>{{ sf_org_name }}</strong>{% endif %}{% if sf_org_id %} — <span style="font-family: monospace; color: var(--accent);">{{ sf_org_id }}</span>{% endif %}{% if sf_instance_url %} — <a href="{{ sf_instance_url }}" target="_blank" rel="noopener" style="color: var(--accent); word-break: break-all;">{{ sf_instance_url }}</a>{% endif %}
+                </span>
+                {% endif %}
+                {% endif %}
+            </nav>
+        </header>
+
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </div>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

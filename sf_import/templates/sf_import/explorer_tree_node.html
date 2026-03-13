@@ -1,0 +1,14 @@
+{% load i18n %}
+<div class="tree-node">
+    <div class="tree-item tree-item-tree {% if node.children %}has-children{% endif %}" data-sheet-name="{{ node.name }}" role="button">
+        <span class="tree-toggle"></span>
+        <span class="tree-icon-file">📋</span> {{ node.name }}{% if node.object %} <span style="color:var(--muted);font-size:0.8em;">({{ node.object }})</span>{% endif %}
+    </div>
+    {% if node.children %}
+    <div class="tree-children">
+        {% for child in node.children %}
+        {% include "sf_import/explorer_tree_node.html" with node=child %}
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>

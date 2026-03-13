@@ -1,0 +1,685 @@
+{% extends "sf_import/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Prévisualisation" %} - {{ file_name }}{% endblock %}
+
+{% block extra_css %}
+.tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.tab { padding: 0.5rem 1rem; background: white; color: #1a2332; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+.tab:hover, .tab.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.table-wrap { overflow-x: auto; margin: 1rem 0; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+th, td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
+th { background: var(--surface); position: sticky; top: 0; }
+tr:hover { background: rgba(255,255,255,0.03); }
+.config-box { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin: 1rem 0; font-family: monospace; font-size: 0.85rem; white-space: pre-wrap; }
+.config-editor-toggle { margin: 0.75rem 0; }
+.config-editor-panel { display: none; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1.25rem; margin: 1rem 0; }
+.config-editor-panel.open { display: block; }
+.config-editor h3 { font-size: 1rem; margin: 1rem 0 0.5rem; color: var(--accent); }
+.config-editor h3:first-child { margin-top: 0; }
+.config-editor table { font-size: 0.85rem; margin-bottom: 1rem; }
+.config-editor th, .config-editor td { padding: 0.4rem 0.6rem; text-align: left; }
+.config-editor input, .config-editor select { padding: 0.35rem 0.5rem; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--text); width: 100%; max-width: 180px; }
+.config-editor .help-text { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+.config-editor .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.8rem; }
+.config-editor .btn-add { background: var(--success); color: var(--bg); }
+.config-editor .btn-remove { background: transparent; color: var(--error); border: 1px solid var(--error); }
+.config-editor .save-config-actions { margin-top: 1rem; }
+.import-actions { margin: 1.5rem 0; }
+.log-box { background: #0d1117; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; font-family: monospace; font-size: 0.8rem; max-height: 200px; overflow-y: auto; margin-top: 1rem; }
+.log-box.has-error { border-color: var(--error); background: rgba(248, 81, 73, 0.1); }
+.import-error-alert { display: none; padding: 1rem; background: rgba(248, 81, 73, 0.2); border: 1px solid var(--error); border-radius: 6px; margin: 1rem 0; color: var(--error); }
+.import-error-alert.visible { display: block; }
+.failed-records { margin-top: 1.5rem; }
+.failed-records h4 { color: var(--error); margin-bottom: 0.75rem; }
+.failed-record-card { background: rgba(248, 81, 73, 0.08); border: 1px solid var(--error); border-radius: 6px; padding: 1rem; margin-bottom: 1rem; }
+.failed-record-card.skipped-parent { background: rgba(63, 185, 80, 0.08); border-color: var(--success); }
+.failed-record-card.skipped-parent .error-msg { color: var(--success); }
+.failed-record-card .meta { font-weight: 600; margin-bottom: 0.5rem; color: var(--text); }
+.failed-record-card .error-msg { color: var(--error); margin: 0.5rem 0; font-weight: 500; }
+.failed-record-card .row-data { font-size: 0.8rem; background: var(--bg); padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem; overflow-x: auto; }
+.failed-record-card .row-data table { font-size: 0.75rem; }
+.failed-record-card .row-data th { padding: 0.25rem 0.5rem; text-align: left; }
+.failed-record-card .row-data td { padding: 0.25rem 0.5rem; }
+.mode-row { margin: 0.75rem 0; }
+.mode-row label { font-weight: 500; margin-right: 0.5rem; }
+.mode-row select, .mode-row input[type="text"] { padding: 0.35rem 0.5rem; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+{% endblock %}
+
+{% block content %}
+<h2>{{ file_name }}</h2>
+
+<div class="config-box">
+{% for line in config_summary %}{{ line }}
+{% endfor %}
+</div>
+
+<button type="button" class="btn btn-secondary config-editor-toggle" id="btn-toggle-config" aria-expanded="false">
+  {% trans "Modifier la configuration" %} ▼
+</button>
+<div class="config-editor-panel" id="config-editor-panel">
+  <div class="config-editor" id="config-editor">
+    <h3>{% trans "Ordre des onglets" %}</h3>
+    <p class="help-text">{% trans "Définir l'ordre d'import et l'objet Salesforce pour chaque onglet." %}</p>
+    <table id="config-sheets-table">
+      <thead><tr>
+        <th>{% trans "Onglet" %}</th>
+        <th>{% trans "Ordre" %}</th>
+        <th>{% trans "Objet Salesforce" %}</th>
+        <th>{% trans "Colonne ID" %}</th>
+        <th>{% trans "Mode" %}</th>
+        <th>{% trans "Champ Upsert" %}</th>
+      </tr></thead>
+      <tbody id="config-sheets-tbody">
+      {% for row in config_sheet_rows %}
+      <tr data-sheet-index="{{ forloop.counter0 }}">
+        <td>
+          <select name="sheet_name" class="sheet-name-select" required data-sheet-index="{{ forloop.counter0 }}">
+            {% for sn in sheet_names %}
+            <option value="{{ sn }}" {% if sn == row.name %}selected{% endif %}>{{ sn }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td><input type="number" name="sheet_order" min="1" value="{{ row.order }}" required style="width:60px;"></td>
+        <td>
+          {% if sobjects %}
+          <select name="salesforce_object" class="sf-object-select" required>
+            {% for obj in sobjects %}
+            <option value="{{ obj.name }}" {% if obj.name == row.salesforce_object %}selected{% endif %}>{{ obj.label }} ({{ obj.name }})</option>
+            {% endfor %}
+          </select>
+          {% else %}
+          <input type="text" name="salesforce_object" value="{{ row.salesforce_object }}" list="sf-objects-list" placeholder="Account, Contact...">
+          <datalist id="sf-objects-list">
+            {% for obj in common_sf_objects %}
+            <option value="{{ obj }}">
+            {% endfor %}
+          </datalist>
+          {% endif %}
+        </td>
+        <td>
+          <select name="id_column" class="id-column-select" data-sheet="{{ row.name }}">
+            {% for col in row.columns %}
+            <option value="{{ col }}" {% if col == row.id_column %}selected{% endif %}>{{ col }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td>
+          <select name="mode">
+            <option value="insert" {% if row.mode == 'insert' %}selected{% endif %}>Insert</option>
+            <option value="update" {% if row.mode == 'update' %}selected{% endif %}>Update</option>
+            <option value="upsert" {% if row.mode == 'upsert' %}selected{% endif %}>Upsert</option>
+          </select>
+        </td>
+        <td><input type="text" name="upsert_field" value="{{ row.upsert_field }}" placeholder="RefExterne__c"></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if connected and sobjects %}
+    <button type="button" class="btn btn-sm btn-add" id="btn-add-sheet">+ {% trans "Ajouter un onglet" %}</button>
+    {% endif %}
+
+    <h3>{% trans "Correspondances" %}</h3>
+    <p class="help-text">{% trans "Lier les colonnes entre onglets (ex: RefCompte → AccountId)." %}</p>
+    <table id="config-mappings-table">
+      <thead><tr>
+        <th>{% trans "Onglet source" %}</th>
+        <th>{% trans "Colonne source" %}</th>
+        <th>{% trans "Onglet cible" %}</th>
+        <th>{% trans "Colonne cible" %}</th>
+        <th>{% trans "Champ Salesforce" %}</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="config-mappings-tbody">
+      {% for m in config.mappings %}
+      <tr data-mapping-index="{{ forloop.counter0 }}">
+        <td>
+          <select name="mapping_source" class="sheet-select">
+            {% for sn in sheet_names %}
+            <option value="{{ sn }}" {% if sn == m.source_sheet %}selected{% endif %}>{{ sn }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td>
+          <select name="mapping_source_col" class="col-select" data-for-sheet="{{ m.source_sheet }}">
+            {% for sn, cols in columns_by_sheet.items %}
+            {% if sn == m.source_sheet %}
+            {% for col in cols %}
+            <option value="{{ col }}" {% if col == m.source_column %}selected{% endif %}>{{ col }}</option>
+            {% endfor %}
+            {% endif %}
+            {% endfor %}
+          </select>
+        </td>
+        <td>
+          <select name="mapping_target" class="sheet-select">
+            {% for sn in sheet_names %}
+            <option value="{{ sn }}" {% if sn == m.target_sheet %}selected{% endif %}>{{ sn }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td>
+          <select name="mapping_target_col" class="col-select" data-for-sheet="{{ m.target_sheet }}">
+            {% for sn, cols in columns_by_sheet.items %}
+            {% if sn == m.target_sheet %}
+            {% for col in cols %}
+            <option value="{{ col }}" {% if col == m.target_column %}selected{% endif %}>{{ col }}</option>
+            {% endfor %}
+            {% endif %}
+            {% endfor %}
+          </select>
+        </td>
+        <td><input type="text" name="mapping_sf_field" value="{{ m.target_salesforce_field|default:'' }}" placeholder="AccountId"></td>
+        <td><button type="button" class="btn btn-sm btn-remove btn-remove-mapping">−</button></td>
+      </tr>
+      {% empty %}
+      <tr class="no-mappings-msg"><td colspan="6" style="color:var(--muted);">{% trans "Aucune correspondance" %}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <button type="button" class="btn btn-sm btn-add" id="btn-add-mapping">+ {% trans "Ajouter une correspondance" %}</button>
+
+    <h3>{% trans "Colonnes pivot" %}</h3>
+    <p class="help-text">{% trans "Colonnes utilisées pour la liaison parent-enfant, non importées." %}</p>
+    <table id="config-pivot-table">
+      <thead><tr>
+        <th>{% trans "Onglet" %}</th>
+        <th>{% trans "Colonne" %}</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="config-pivot-tbody">
+      {% for p in config.pivot_columns %}
+      <tr data-pivot-index="{{ forloop.counter0 }}">
+        <td>
+          <select name="pivot_sheet" class="sheet-select">
+            {% for sn in sheet_names %}
+            <option value="{{ sn }}" {% if sn == p.sheet %}selected{% endif %}>{{ sn }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td>
+          <select name="pivot_col" class="col-select" data-for-sheet="{{ p.sheet }}">
+            {% for sn, cols in columns_by_sheet.items %}
+            {% if sn == p.sheet %}
+            {% for col in cols %}
+            <option value="{{ col }}" {% if col == p.column %}selected{% endif %}>{{ col }}</option>
+            {% endfor %}
+            {% endif %}
+            {% endfor %}
+          </select>
+        </td>
+        <td><button type="button" class="btn btn-sm btn-remove btn-remove-pivot">−</button></td>
+      </tr>
+      {% empty %}
+      <tr class="no-pivot-msg"><td colspan="3" style="color:var(--muted);">{% trans "Aucune colonne pivot" %}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <button type="button" class="btn btn-sm btn-add" id="btn-add-pivot">+ {% trans "Ajouter une colonne pivot" %}</button>
+
+    <div class="save-config-actions">
+      <button type="button" class="btn" id="btn-save-config">{% trans "Enregistrer la configuration dans l'Excel" %}</button>
+      <span id="config-save-message" style="margin-left:1rem;"></span>
+    </div>
+  </div>
+</div>
+
+<form id="import-form">
+{% csrf_token %}
+<div class="tabs">
+{% for sheet in sheets %}
+<button class="tab {% if forloop.first %}active{% endif %}" data-tab="sheet-{{ forloop.counter }}">{{ sheet.name }} ({{ sheet.total_rows }} {% trans "lignes" %})</button>
+{% endfor %}
+</div>
+
+{% for sheet in sheets %}
+<div id="sheet-{{ forloop.counter }}" class="tab-content {% if forloop.first %}active{% endif %}" data-sheet-name="{{ sheet.name }}">
+    <p><span class="badge badge-muted">{% trans "Ordre" %} {{ sheet.order }}</span> {% trans "Objet" %}: <strong>{% if sheet.object %}{{ sheet.object }}{% else %}{% trans "(non défini)" %}{% endif %}</strong></p>
+    <p class="mode-row">
+        <label for="mode-sheet-{{ forloop.counter }}">{% trans "Mode d'import" %} :</label>
+        <select name="mode_{{ sheet.name }}" id="mode-sheet-{{ forloop.counter }}" class="mode-select">
+            <option value="insert" {% if sheet.mode == 'insert' %}selected{% endif %}>Insert</option>
+            <option value="update" {% if sheet.mode == 'update' %}selected{% endif %}>Update</option>
+            <option value="upsert" {% if sheet.mode == 'upsert' %}selected{% endif %}>Upsert</option>
+        </select>
+        <span class="upsert-field-wrapper" data-for-sheet="{{ sheet.name }}" style="{% if sheet.mode != 'upsert' %}display:none;{% endif %} margin-left: 1rem;">
+            <label for="upsert-sheet-{{ forloop.counter }}">{% trans "Champ externe ID" %} :</label>
+            <input type="text" name="upsert_field_{{ sheet.name }}" id="upsert-sheet-{{ forloop.counter }}" value="{{ sheet.upsert_external_id_field }}" placeholder="ex: RefExterne__c">
+        </span>
+    </p>
+    <div class="table-wrap">
+        <table>
+            <thead><tr>{% for col in sheet.columns %}<th>{{ col }}</th>{% endfor %}</tr></thead>
+            <tbody>
+            {% for row in sheet.rows %}
+            <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endfor %}
+
+<div class="import-actions">
+    {% if connected %}
+    <button type="button" id="btn-import" class="btn">{% trans "Lancer l'import" %}</button>
+    <div id="import-error-alert" class="import-error-alert" role="alert"></div>
+    <div id="import-log" class="log-box" style="display:none;"></div>
+    <div id="import-failed-records" class="failed-records" style="display:none;"></div>
+    {% else %}
+    <a href="{% url 'sf_login' %}" class="btn">{% trans "Se connecter à Salesforce pour importer" %}</a>
+    {% endif %}
+</div>
+</form>
+
+{% if connected and sobjects %}
+<div id="modal-add-sheet" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center;" class="modal-add-sheet">
+  <div style="background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:1.5rem; max-width:400px; width:90%;">
+    <h3 style="margin-top:0;">{% trans "Ajouter un onglet" %}</h3>
+    <form id="form-add-sheet">
+      <input type="hidden" name="parent_sheet" id="add-sheet-parent" value="">
+      <div style="margin-bottom:1rem;">
+        <label for="add-sheet-name" style="display:block; margin-bottom:0.25rem;">{% trans "Nom de l'onglet" %}</label>
+        <input type="text" id="add-sheet-name" required placeholder="Contact" style="width:100%; padding:0.5rem; border-radius:4px; border:1px solid var(--border); background:var(--bg); color:var(--text);">
+      </div>
+      <div style="margin-bottom:1rem;">
+        <label for="add-sheet-object" style="display:block; margin-bottom:0.25rem;">{% trans "Objet Salesforce" %}</label>
+        <select id="add-sheet-object" required style="width:100%; padding:0.5rem; border-radius:4px; border:1px solid var(--border); background:var(--bg); color:var(--text);">
+          {% for obj in sobjects %}
+          <option value="{{ obj.name }}">{{ obj.label }} ({{ obj.name }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+        <button type="submit" class="btn">{% trans "Ajouter" %}</button>
+        <button type="button" class="btn btn-secondary" id="btn-cancel-add-sheet">{% trans "Annuler" %}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var CONFIG_DATA = {
+  sheet_names: {{ sheet_names_json|safe }},
+  columns_by_sheet: {{ columns_by_sheet_json|safe }}
+};
+var I18N = {
+    edit_config: "{% trans 'Modifier la configuration' %}",
+    hide_config: "{% trans 'Masquer la configuration' %}",
+    config_saved: "{% trans 'Configuration enregistrée.' %}",
+    config_error: "{% trans 'Erreur' %}",
+    add_mapping: "{% trans 'Ajouter une correspondance' %}",
+    add_pivot: "{% trans 'Ajouter une colonne pivot' %}",
+    failed_rows: "{% trans 'Lignes en échec' %}",
+    sheet_label: "{% trans 'Onglet' %}",
+    row_label: "{% trans 'Ligne' %}",
+    import_in_progress: "{% trans 'Import en cours...' %}",
+    unknown_error: "{% trans 'Erreur inconnue' %}",
+    server_error: "{% trans 'Erreur serveur (réponse invalide). Code: ' %}",
+    network_error: "{% trans 'Erreur réseau : ' %}"
+};
+(function() {
+  var btnAdd = document.getElementById('btn-add-sheet');
+  var modal = document.getElementById('modal-add-sheet');
+  var form = document.getElementById('form-add-sheet');
+  var parentInput = document.getElementById('add-sheet-parent');
+  var nameInput = document.getElementById('add-sheet-name');
+  var objectSelect = document.getElementById('add-sheet-object');
+  if (btnAdd && modal && form) {
+    btnAdd.addEventListener('click', function() {
+      if (parentInput) parentInput.value = '';
+      if (nameInput) nameInput.value = '';
+      modal.style.display = 'flex';
+      if (nameInput) nameInput.focus();
+    });
+    document.getElementById('btn-cancel-add-sheet')?.addEventListener('click', function() { modal.style.display = 'none'; });
+    modal.addEventListener('click', function(e) { if (e.target === modal) modal.style.display = 'none'; });
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      var name = nameInput?.value?.trim() || objectSelect?.value;
+      var obj = objectSelect?.value;
+      if (!obj) return;
+      var payload = { sheet_name: name, salesforce_object: obj };
+      if (parentInput?.value) payload.parent_sheet = parentInput.value;
+      try {
+        var r = await fetch('{% url "add_sheet" %}', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+          body: JSON.stringify(payload)
+        });
+        var d = await r.json();
+        if (d.success) { modal.style.display = 'none'; location.reload(); }
+        else alert(d.error || 'Erreur');
+      } catch (err) { alert(err.message); }
+    });
+  }
+})();
+document.querySelectorAll('.mode-select').forEach(sel => {
+    sel.addEventListener('change', function() {
+        var wrapper = this.closest('.tab-content').querySelector('.upsert-field-wrapper');
+        if (wrapper) wrapper.style.display = this.value === 'upsert' ? 'inline' : 'none';
+    });
+});
+document.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+});
+
+(function() {
+  var panel = document.getElementById('config-editor-panel');
+  var btnToggle = document.getElementById('btn-toggle-config');
+  if (btnToggle && panel) {
+    btnToggle.addEventListener('click', function() {
+      var open = panel.classList.toggle('open');
+      btnToggle.textContent = open ? (I18N.hide_config || "Masquer la configuration") + " ▲" : (I18N.edit_config || "Modifier la configuration") + " ▼";
+      btnToggle.setAttribute('aria-expanded', open);
+    });
+  }
+
+  function makeColSelect(sheetName, selectedCol) {
+    var cols = CONFIG_DATA.columns_by_sheet[sheetName] || [];
+    var html = '<select name="' + (arguments[2] || 'col') + '" class="col-select" data-for-sheet="' + sheetName + '">';
+    cols.forEach(function(c) {
+      html += '<option value="' + escapeHtml(c) + '"' + (c === selectedCol ? ' selected' : '') + '>' + escapeHtml(c) + '</option>';
+    });
+    return html + '</select>';
+  }
+
+  function makeSheetSelect(selected) {
+    var html = '<select class="sheet-select">';
+    (CONFIG_DATA.sheet_names || []).forEach(function(s) {
+      html += '<option value="' + escapeHtml(s) + '"' + (s === selected ? ' selected' : '') + '>' + escapeHtml(s) + '</option>';
+    });
+    return html + '</select>';
+  }
+
+  document.getElementById('btn-add-mapping')?.addEventListener('click', function() {
+    var tbody = document.getElementById('config-mappings-tbody');
+    var noMsg = tbody.querySelector('.no-mappings-msg');
+    if (noMsg) noMsg.remove();
+    var firstSheet = CONFIG_DATA.sheet_names[0] || '';
+    var firstCol = (CONFIG_DATA.columns_by_sheet[firstSheet] || [])[0] || '';
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td>' + makeSheetSelect(firstSheet) + '</td><td>' + makeColSelect(firstSheet, firstCol, 'mapping_source_col') +
+      '</td><td>' + makeSheetSelect(firstSheet) + '</td><td>' + makeColSelect(firstSheet, firstCol, 'mapping_target_col') +
+      '</td><td><input type="text" name="mapping_sf_field" placeholder="AccountId"></td><td><button type="button" class="btn btn-sm btn-remove btn-remove-mapping">−</button></td>';
+    tbody.appendChild(tr);
+    bindColSelectListeners(tr);
+    tr.querySelector('.btn-remove-mapping').addEventListener('click', function() { tr.remove(); });
+  });
+
+  document.getElementById('btn-add-pivot')?.addEventListener('click', function() {
+    var tbody = document.getElementById('config-pivot-tbody');
+    var noMsg = tbody.querySelector('.no-pivot-msg');
+    if (noMsg) noMsg.remove();
+    var firstSheet = CONFIG_DATA.sheet_names[0] || '';
+    var firstCol = (CONFIG_DATA.columns_by_sheet[firstSheet] || [])[0] || '';
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td>' + makeSheetSelect(firstSheet) + '</td><td>' + makeColSelect(firstSheet, firstCol, 'pivot_col') +
+      '</td><td><button type="button" class="btn btn-sm btn-remove btn-remove-pivot">−</button></td>';
+    tbody.appendChild(tr);
+    bindColSelectListeners(tr);
+    tr.querySelector('.btn-remove-pivot').addEventListener('click', function() { tr.remove(); });
+  });
+
+  function bindColSelectListeners(container) {
+    if (!container) return;
+    var sheetSelects = container.querySelectorAll('.sheet-select');
+    var colSelects = container.querySelectorAll('.col-select');
+    sheetSelects.forEach(function(sel, i) {
+      sel.removeEventListener('change', sel._colUpdateHandler);
+      sel._colUpdateHandler = function() {
+        var colSelect = colSelects[i];
+        if (colSelect) {
+          var sheet = this.value;
+          var cols = CONFIG_DATA.columns_by_sheet[sheet] || [];
+          var cur = colSelect.value;
+          colSelect.innerHTML = cols.map(function(c) {
+            return '<option value="' + escapeHtml(c) + '"' + (c === cur ? ' selected' : '') + '>' + escapeHtml(c) + '</option>';
+          }).join('');
+          colSelect.dataset.forSheet = sheet;
+        }
+      };
+      sel.addEventListener('change', sel._colUpdateHandler);
+    });
+  }
+  document.getElementById('config-editor')?.querySelectorAll('tr').forEach(function(tr) {
+    bindColSelectListeners(tr);
+  });
+  document.getElementById('config-editor')?.addEventListener('click', function(e) {
+    if (e.target.classList.contains('btn-remove-mapping') || e.target.classList.contains('btn-remove-pivot')) {
+      e.target.closest('tr').remove();
+    }
+  });
+
+  document.querySelectorAll('.sheet-name-select').forEach(function(sel) {
+    sel.addEventListener('change', function() {
+      var row = this.closest('tr');
+      var idColSelect = row.querySelector('.id-column-select');
+      if (idColSelect) {
+        var sheet = this.value;
+        var cols = CONFIG_DATA.columns_by_sheet[sheet] || [];
+        var cur = idColSelect.value;
+        idColSelect.innerHTML = cols.map(function(c) {
+          return '<option value="' + escapeHtml(c) + '"' + (cols.indexOf(cur) >= 0 && c === cur ? ' selected' : '') + '>' + escapeHtml(c) + '</option>';
+        }).join('');
+        idColSelect.dataset.sheet = sheet;
+      }
+    });
+  });
+
+  document.getElementById('btn-save-config')?.addEventListener('click', async function() {
+    var btn = this;
+    var msgEl = document.getElementById('config-save-message');
+    btn.disabled = true;
+    msgEl.textContent = '';
+    msgEl.style.color = '';
+
+    var sheets = [];
+    document.querySelectorAll('#config-sheets-tbody tr').forEach(function(tr) {
+      var nameSel = tr.querySelector('.sheet-name-select');
+      var orderInp = tr.querySelector('input[name="sheet_order"]');
+      var objInp = tr.querySelector('input[name="salesforce_object"]');
+      var idSel = tr.querySelector('.id-column-select');
+      var modeSel = tr.querySelector('select[name="mode"]');
+      var upsertInp = tr.querySelector('input[name="upsert_field"]');
+      if (nameSel) {
+        sheets.push({
+          name: nameSel.value,
+          order: parseInt(orderInp?.value || 1, 10),
+          salesforce_object: objInp?.value || '',
+          id_column: idSel?.value || 'Id',
+          mode: modeSel?.value || 'insert',
+          upsert_external_id_field: upsertInp?.value || null
+        });
+      }
+    });
+
+    var mappings = [];
+    document.querySelectorAll('#config-mappings-tbody tr').forEach(function(tr) {
+      if (tr.classList.contains('no-mappings-msg')) return;
+      var sheetSelects = tr.querySelectorAll('.sheet-select');
+      var colSelects = tr.querySelectorAll('.col-select');
+      var src = sheetSelects[0]?.value;
+      var srcCol = colSelects[0]?.value;
+      var tgt = sheetSelects[1]?.value;
+      var tgtCol = colSelects[1]?.value;
+      var sfField = tr.querySelector('input[name="mapping_sf_field"]')?.value;
+      if (src && srcCol && tgt && tgtCol) {
+        mappings.push({
+          source_sheet: src,
+          source_column: srcCol,
+          target_sheet: tgt,
+          target_column: tgtCol,
+          target_salesforce_field: sfField || null
+        });
+      }
+    });
+
+    var pivot_cols = [];
+    document.querySelectorAll('#config-pivot-tbody tr').forEach(function(tr) {
+      if (tr.classList.contains('no-pivot-msg')) return;
+      var sheet = tr.querySelector('.sheet-select')?.value;
+      var col = tr.querySelector('.col-select')?.value;
+      if (sheet && col) {
+        pivot_cols.push({ sheet: sheet, column: col });
+      }
+    });
+
+    if (sheets.length === 0) {
+      msgEl.textContent = (I18N.config_error || 'Erreur') + ': Au moins un onglet doit être configuré.';
+      msgEl.style.color = 'var(--error)';
+      btn.disabled = false;
+      return;
+    }
+    var needObject = sheets.find(function(s) { return !s.salesforce_object || !s.salesforce_object.trim(); });
+    if (needObject) {
+      msgEl.textContent = (I18N.config_error || 'Erreur') + ': Indiquez l\'objet Salesforce pour chaque onglet (ex: Account, Contact).';
+      msgEl.style.color = 'var(--error)';
+      btn.disabled = false;
+      return;
+    }
+    if (sheets.some(function(s) { return s.mode === 'upsert' && (!s.upsert_external_id_field || !s.upsert_external_id_field.trim()); })) {
+      msgEl.textContent = (I18N.config_error || 'Erreur') + ': En mode Upsert, indiquez le champ externe ID (ex: RefExterne__c).';
+      msgEl.style.color = 'var(--error)';
+      btn.disabled = false;
+      return;
+    }
+
+    var configJson = JSON.stringify({ sheets: sheets, mappings: mappings, pivot_columns: pivot_cols });
+
+    try {
+      var res = await fetch('{% url "save_config" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: configJson
+      });
+      var data = await res.json();
+      if (data.success) {
+        msgEl.textContent = I18N.config_saved;
+        msgEl.style.color = 'var(--success)';
+        setTimeout(function() { location.reload(); }, 1200);
+      } else {
+        msgEl.textContent = (I18N.config_error || 'Erreur') + ': ' + (data.error || '');
+        msgEl.style.color = 'var(--error)';
+      }
+    } catch (e) {
+      msgEl.textContent = (I18N.config_error || 'Erreur') + ': ' + (e.message || String(e));
+      msgEl.style.color = 'var(--error)';
+    } finally {
+      btn.disabled = false;
+    }
+  });
+})();
+
+function escapeHtml(s) {
+    if (!s) return '';
+    var div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+}
+
+document.getElementById('btn-import')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-import');
+    const logEl = document.getElementById('import-log');
+    const errorEl = document.getElementById('import-error-alert');
+    btn.disabled = true;
+    logEl.style.display = 'block';
+    logEl.classList.remove('has-error');
+    errorEl.classList.remove('visible');
+    errorEl.textContent = '';
+    document.getElementById('import-failed-records').style.display = 'none';
+    document.getElementById('import-failed-records').innerHTML = '';
+    logEl.textContent = I18N.import_in_progress + '\n';
+
+    try {
+        const res = await fetch('{% url "run_import" %}', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': document.querySelector('#import-form [name=csrfmiddlewaretoken]').value },
+            body: new FormData(document.getElementById('import-form'))
+        });
+
+        let data;
+        try {
+            data = await res.json();
+        } catch (parseErr) {
+            errorEl.textContent = I18N.server_error + res.status + ' ' + res.statusText;
+            errorEl.classList.add('visible');
+            logEl.classList.add('has-error');
+            logEl.textContent += '\n' + errorEl.textContent;
+            document.getElementById('import-failed-records').style.display = 'none';
+            return;
+        }
+
+        if (data.success) {
+            logEl.textContent = data.logs.join('\n');
+            var failedEl = document.getElementById('import-failed-records');
+            var failed = data.failed_records || [];
+            if (failed.length > 0) {
+                failedEl.style.display = 'block';
+                failedEl.innerHTML = '<h4>' + I18N.failed_rows + ' (' + failed.length + ')</h4>' + failed.map(function(f) {
+                    var rowHtml = '';
+                    if (f.row_data && Object.keys(f.row_data).length > 0) {
+                        rowHtml = '<div class="row-data"><table><tr>' +
+                            Object.keys(f.row_data).map(function(k) { return '<th>' + escapeHtml(k) + '</th>'; }).join('') + '</tr><tr>' +
+                            Object.keys(f.row_data).map(function(k) { return '<td>' + escapeHtml(f.row_data[k]) + '</td>'; }).join('') + '</tr></table></div>';
+                    }
+                    var cardClass = 'failed-record-card' + (f.is_skipped_parent_failed ? ' skipped-parent' : '');
+                    return '<div class="' + cardClass + '"><div class="meta">' + I18N.sheet_label + ': ' + escapeHtml(f.sheet) + ' — ' + I18N.row_label + ' ' + f.row_index + '</div>' +
+                        '<div class="error-msg">' + escapeHtml(f.error) + '</div>' + rowHtml + '</div>';
+                }).join('');
+            } else {
+                failedEl.style.display = 'none';
+                failedEl.innerHTML = '';
+            }
+            if (data.sheets_data) {
+                data.sheets_data.forEach(function(sheet, idx) {
+                    var tabContent = document.querySelector('[data-sheet-name="' + sheet.name + '"]');
+                    if (!tabContent) return;
+                    var table = tabContent.querySelector('table');
+                    if (!table) return;
+                    var thead = table.querySelector('thead tr');
+                    var tbody = table.querySelector('tbody');
+                    if (thead && tbody && sheet.columns && sheet.rows) {
+                        thead.innerHTML = sheet.columns.map(function(c) { return '<th>' + escapeHtml(c) + '</th>'; }).join('');
+                        tbody.innerHTML = sheet.rows.map(function(row) {
+                            return '<tr>' + row.map(function(cell) { return '<td>' + escapeHtml(cell) + '</td>'; }).join('') + '</tr>';
+                        }).join('');
+                    }
+                });
+            }
+        } else {
+            var errMsg = data.error || I18N.unknown_error;
+            errorEl.textContent = errMsg;
+            errorEl.classList.add('visible');
+            logEl.classList.add('has-error');
+            logEl.textContent = 'ERREUR :\n' + errMsg;
+            document.getElementById('import-failed-records').style.display = 'none';
+        }
+    } catch (e) {
+        var errMsg = I18N.network_error + (e.message || String(e));
+        errorEl.textContent = errMsg;
+        errorEl.classList.add('visible');
+        logEl.classList.add('has-error');
+        logEl.textContent += '\n' + errMsg;
+        document.getElementById('import-failed-records').style.display = 'none';
+    } finally {
+        btn.disabled = false;
+    }
+});
+</script>
+{% endblock %}

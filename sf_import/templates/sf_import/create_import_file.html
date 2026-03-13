@@ -1,0 +1,96 @@
+{% extends "sf_import/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Créer un fichier pour import" %}{% endblock %}
+
+{% block extra_css %}
+.create-file-container { max-width: 900px; }
+.create-file-container h2 { font-size: 1.2rem; margin-bottom: 1rem; color: var(--accent); }
+.obj-list { max-height: 400px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; background: var(--surface); margin: 1rem 0; }
+.obj-list label { display: block; padding: 0.35rem 0; cursor: pointer; }
+.obj-list label:hover { color: var(--accent); }
+.obj-list input { margin-right: 0.5rem; }
+.obj-filter { margin-bottom: 0.75rem; }
+.obj-filter input { padding: 0.4rem 0.75rem; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--text); width: 100%; max-width: 300px; }
+.obj-actions { margin: 1rem 0; }
+.obj-actions .btn { margin-right: 0.5rem; }
+.badge-custom { background: rgba(88, 166, 255, 0.3); color: var(--accent); font-size: 0.65rem; padding: 0.1rem 0.35rem; margin-left: 0.5rem; }
+{% endblock %}
+
+{% block content %}
+<div class="create-file-container">
+<h2>{% trans "Créer un fichier pour import" %}</h2>
+<p style="color: var(--muted); margin-bottom: 1rem;">
+    {% trans "Sélectionnez les objets Salesforce pour générer un fichier Excel prêt à l'import. Chaque onglet contiendra les champs avec des commentaires d'aide." %}
+</p>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+<form method="post" action="{% url 'create_import_file_generate' %}" id="create-form">
+{% csrf_token %}
+<div class="obj-filter">
+    <input type="text" id="filter-objs" placeholder="{% trans 'Filtrer les objets...' %}" autocomplete="off">
+</div>
+<div class="obj-actions">
+    <button type="button" class="btn btn-secondary" id="btn-select-all">{% trans "Tout sélectionner" %}</button>
+    <button type="button" class="btn btn-secondary" id="btn-select-none">{% trans "Tout désélectionner" %}</button>
+    <button type="button" class="btn btn-secondary" id="btn-select-standard">{% trans "Objets standard uniquement" %}</button>
+    <button type="button" class="btn btn-secondary" id="btn-select-custom">{% trans "Objets personnalisés uniquement" %}</button>
+</div>
+<div class="obj-list" id="obj-list">
+    {% for obj in sobjects %}
+    <label class="obj-item" data-name="{{ obj.name|lower }}" data-label="{{ obj.label|lower }}" data-custom="{{ obj.custom|yesno:'1,0' }}">
+        <input type="checkbox" name="objects" value="{{ obj.name }}">
+        {{ obj.label }} ({{ obj.name }}){% if obj.custom %} <span class="badge badge-custom">custom</span>{% endif %}
+    </label>
+    {% empty %}
+    <p style="color: var(--muted);">{% trans "Aucun objet disponible. Connectez-vous à Salesforce." %}</p>
+    {% endfor %}
+</div>
+<div style="margin-top: 1.5rem;">
+    <button type="submit" class="btn" id="btn-generate" {% if not sobjects %}disabled{% endif %}>
+        {% trans "Générer le fichier Excel" %}
+    </button>
+</div>
+</form>
+</div>
+
+<script>
+(function() {
+    var filterInput = document.getElementById('filter-objs');
+    var list = document.getElementById('obj-list');
+    var items = list ? list.querySelectorAll('.obj-item') : [];
+
+    filterInput && filterInput.addEventListener('input', function() {
+        var q = this.value.toLowerCase();
+        items.forEach(function(label) {
+            var name = label.dataset.name || '';
+            var labelText = label.dataset.label || '';
+            var show = !q || name.indexOf(q) >= 0 || labelText.indexOf(q) >= 0;
+            label.style.display = show ? '' : 'none';
+        });
+    });
+
+    document.getElementById('btn-select-all')?.addEventListener('click', function() {
+        items.forEach(function(l) { if (l.style.display !== 'none') l.querySelector('input').checked = true; });
+    });
+    document.getElementById('btn-select-none')?.addEventListener('click', function() {
+        items.forEach(function(l) { l.querySelector('input').checked = false; });
+    });
+    document.getElementById('btn-select-standard')?.addEventListener('click', function() {
+        items.forEach(function(l) {
+            var inp = l.querySelector('input');
+            inp.checked = l.dataset.custom === '0';
+        });
+    });
+    document.getElementById('btn-select-custom')?.addEventListener('click', function() {
+        items.forEach(function(l) {
+            var inp = l.querySelector('input');
+            inp.checked = l.dataset.custom === '1';
+        });
+    });
+})();
+</script>
+{% endblock %}

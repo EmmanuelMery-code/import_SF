@@ -1,0 +1,35 @@
+{% extends "sf_import/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Accueil" %} - {% trans "Import Salesforce" %}{% endblock %}
+
+{% block content %}
+<div class="card" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 2rem; max-width: 600px;">
+    <h2 style="margin-top: 0;">{% trans "Charger un fichier Excel" %}</h2>
+    <p style="color: var(--muted);">{% trans "Format .xlsx ou .xls avec un onglet _Config_ pour l'ordre et les correspondances." %}</p>
+
+    <form method="post" action="{% url 'upload' %}" enctype="multipart/form-data" style="margin-top: 1.5rem;">
+        {% csrf_token %}
+        <input type="file" name="excel_file" accept=".xlsx,.xls" required
+               style="display: block; margin-bottom: 1rem; padding: 0.5rem; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); width: 100%;">
+        <button type="submit" class="btn">{% trans "Charger le fichier" %}</button>
+    </form>
+
+    {% if not connected %}
+    <p style="margin-top: 1.5rem; color: var(--muted); font-size: 0.9rem;">
+        {% trans "Connectez-vous à Salesforce via le bouton en haut pour pouvoir lancer les imports." %}
+    </p>
+    {% endif %}
+</div>
+
+{% if current_file_name %}
+<p style="margin-top: 1rem;">
+    {% trans "Fichier actuel" %} : <strong>{{ current_file_name }}</strong>
+    <a href="{% url 'preview' %}" class="btn btn-secondary" style="margin-left: 1rem;">{% trans "Voir la prévisualisation" %}</a>
+</p>
+{% endif %}
+
+<p style="margin-top: 1rem;">
+    <a href="{% url 'explorer' %}" class="btn btn-secondary">{% trans "Vue Explorateur" %}</a>
+</p>
+{% endblock %}

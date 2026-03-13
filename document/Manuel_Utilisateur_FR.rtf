@@ -1,0 +1,115 @@
+{\rtf1\ansi\ansicpg1252\deff0\nouicompat{\fonttbl{\f0\fnil\fcharset0 Calibri;}{\f1\fnil\fcharset0 Consolas;}}
+{\colortbl ;\red0\green112\blue192;\red192\green0\blue0;}
+\viewkind4\uc1\pard\sa200\sl276\slmult1\f0\fs22\lang1036
+
+\b\fs28 Manuel d'utilisation\b0\fs22\par
+\b Import Salesforce Multi-Onglets\b0\par
+\par
+Application Django pour importer des donn\'e9es vers Salesforce \'e0 partir d'un fichier Excel multi-onglets, avec authentification par Session ID et r\'e9plication automatique des IDs entre onglets.\par
+\par
+
+\b\fs24 1. OBJECTIF DE L'OUTIL\b0\fs22\par
+\par
+Cet outil permet d'importer en masse des donn\'e9es depuis un fichier Excel (.xlsx ou .xls) vers Salesforce. Il g\'e8re :\par
+\bullet  Plusieurs onglets li\'e9s (ex : Comptes, Contacts, Opportunit\'e9s)\par
+\bullet  La r\'e9plication des IDs entre onglets (ex : AccountId sur les Contacts apr\'e8s import des Comptes)\par
+\bullet  La configuration via un onglet _Config_ dans le fichier Excel\par
+\par
+Vous n'avez pas besoin de Connected App Salesforce : une connexion par Session ID suffit.\par
+\par
+
+\b\fs24 2. INSTALLATION\b0\fs22\par
+\par
+
+\b 2.1 Pr\'e9requis\b0\par
+\bullet  Python 3.9 ou sup\'e9rieur\par
+\bullet  pip\par
+\par
+
+\b 2.2 Installation des d\'e9pendances\b0\par
+\f1 pip install -r requirements.txt\par
+\f0\par
+
+\b 2.3 Migrations et lancement\b0\par
+\f1 python manage.py migrate\par
+python manage.py runserver\par
+\f0\par
+Ouvrez \cf1 http://localhost:8000/\cf0\par
+\par
+
+\b\fs24 3. CONNEXION \'c0 SALESFORCE\b0\fs22\par
+\par
+Cliquez sur \'ab Connexion Salesforce \'bb dans le menu.\par
+\par
+\b Option 1 \'96 Bookmarklet :\b0 Glissez le lien \'ab R\'e9cup\'e9rer ma session \'bb dans vos favoris. Sur une page Salesforce (ex : /services/data/), cliquez le lien pour r\'e9cup\'e9rer l'URL d'instance et le Session ID.\par
+\par
+\b Option 2 \'96 Saisie manuelle :\b0 Ouvrez une page Visualforce affichant \f1 \{!$Api.Session_ID\}\f0 , ou utilisez Developer Console : Execute Anonymous \'96 \f1 System.debug(UserInfo.getSessionId());\f0 \par
+\par
+\cf2 Important : Lightning ne fournit pas de Session ID utilisable pour l'API. Utilisez une page Visualforce en preview.\cf0\par
+\par
+
+\b\fs24 4. VUE EXPLORATEUR\b0\fs22\par
+\par
+L'Explorateur offre une interface compl\'e8te :\par
+\bullet  \b Arborescence \'e0 gauche :\b0 Contenu du fichier (onglets), Configuration, Pr\'e9visualisation\par
+\bullet  \b Panneau central :\b0 Contenu de l'\'e9l\'e9ment s\'e9lectionn\'e9\par
+\bullet  \b S\'e9lectionner un fichier :\b0 Chargement d'un Excel existant\par
+\bullet  \b Cr\'e9er un fichier :\b0 G\'e9n\'e9ration d'un fichier type \'e0 partir d'objets Salesforce\par
+\par
+\b 4.1 Clic droit sur Configuration\b0\par
+\bullet  Commencer une nouvelle configuration : remet tout \'e0 z\'e9ro\par
+\bullet  Ajouter un onglet : modal pour cr\'e9er un nouvel onglet\par
+\bullet  Exporter la configuration et les onglets\par
+\bullet  Vue graphique : affichage des correspondances en sch\'e9ma\par
+\par
+\b 4.2 Clic droit sur un onglet (treeview)\b0\par
+\bullet  Ajouter un onglet enfant\par
+\bullet  Renommer cet onglet\par
+\bullet  Supprimer cet onglet\par
+\par
+\b 4.3 Vue graphique\b0\par
+Chaque onglet est une carte. Les fl\'e8ches relient les champs li\'e9s (correspondances).\par
+\bullet  Clic droit sur un champ : Ajouter/Retirer des colonnes pivot, D\'e9finir d\'e9but/fin de fl\'e8che, Supprimer la fl\'e8che\par
+\bullet  Clic droit sur une carte : Supprimer cet onglet\par
+\bullet  Glisser le titre pour d\'e9placer, coin bas-droit pour redimensionner\par
+\par
+
+\b\fs24 5. STRUCTURE DU FICHIER EXCEL\b0\fs22\par
+\par
+L'onglet \f1 _Config_\f0 contient :\par
+\par
+\b OrdreOnglets :\b0\par
+(vide) | NomOnglet | Ordre | ObjetSalesforce | ColonneID | Mode | ChampUpsert\par
+| Comptes | 1 | Account | Id | insert |\par
+| Contacts | 2 | Contact | Id | insert |\par
+\par
+\b Correspondances :\b0\par
+(vide) | FeuilleSource | ColonneSource | FeuilleCible | ColonneCible | ChampSF\par
+| Comptes | RefExterne | Contacts | RefCompte | AccountId\par
+\par
+\b ColonnesPivot :\b0\par
+Colonnes NON import\'e9es (utilis\'e9es uniquement pour la correspondance).\par
+(vide) | Feuille | Colonne\par
+| Contacts | RefCompte\par
+\par
+
+\b\fs24 6. UTILISATION\b0\fs22\par
+\par
+1. Chargez un fichier Excel (ou cr\'e9ez-en un)\par
+2. Configurez les onglets, correspondances et colonnes pivot via l'interface ou l'onglet _Config_\par
+3. Pr\'e9visualisez les donn\'e9es\par
+4. Connectez-vous \'e0 Salesforce et lancez l'import\par
+\par
+Apr\'e8s l'import, les IDs Salesforce sont r\'e9pliqu\'e9s sur les colonnes li\'e9es.\par
+\par
+
+\b\fs24 7. D\'c9PANNAGE\b0\fs22\par
+\par
+\b Session invalide :\b0 Utilisez une page Visualforce en preview, pas Lightning.\par
+\par
+\b Colonne non import\'e9e :\b0 Ajoutez-la en ColonnePivot ou comme ColonneCible dans une correspondance.\par
+\par
+\b Erreur sur des lignes :\b0 V\'e9rifiez les champs obligatoires et les types de donn\'e9es Salesforce.\par
+\par
+\par
+}
